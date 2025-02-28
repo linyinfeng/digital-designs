@@ -2,10 +2,10 @@ from build123d import *
 import math
 from ocp_vscode import show
 
-slots_number = 24
+slots_number = 15
 precision = 0.2  # mm
-thickness = 1  # mm
-friction_part_thickness = 1.5  # mm
+thickness = 2  # mm
+friction_part_thickness = 2  # mm
 friction_margin = 0.4 # mm
 corner_radius = 3 # mm
 fillet_radius = 3 # mm
