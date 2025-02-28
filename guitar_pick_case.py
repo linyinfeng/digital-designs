@@ -165,3 +165,6 @@ assembly = Compound(label="assembly", children=[body, Pos(Z=lower_depth) * upper
 show(assembly)
 export_stl(body, "outputs/body.stl")
 export_stl(Rotation(X=180) * upper_case, "outputs/case.stl")
+
+export_step(body, "outputs/body.step")
+export_step(Rotation(X=180) * upper_case, "outputs/case.step")
