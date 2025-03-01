@@ -25,7 +25,10 @@ friction_chamfer_depth = (
 front_back_thickness = outer_thickness + front_back_reserve_space  # mm
 pick_thickness = 2.0  # mm
 slot_padding = precision  # mm
+slot_extend = 0.4 # mm
+slot_extend_depth = 2 # mm
 single_slot_space = pick_thickness + slot_padding * 2
+single_slot_space_extended = single_slot_space + slot_extend * 2
 slot_corner_radius = (single_slot_space - precision) / 2.0
 slot_spacing = single_slot_space + thickness
 total_slots_length = slots_number * single_slot_space + (slots_number - 1) * thickness
@@ -68,13 +71,18 @@ keep_air = Part()
 pick_slot_face = RectangleRounded(
     single_slot_space, total_width - outer_thickness * 2.0, radius=slot_corner_radius
 )
-pick_slot_box = extrude(pick_slot_face, amount=lower_depth)
+pick_slot_extended_face = RectangleRounded(
+    single_slot_space_extended, total_width - outer_thickness * 2.0, radius=slot_corner_radius
+)
+pick_slot_entry_sketch = pick_slot_extended_face + Pos(Z=slot_extend_depth) * pick_slot_face
+pick_slot_entry = loft(pick_slot_entry_sketch)
+pick_slot_box = pick_slot_entry + Pos(Z=slot_extend_depth) * extrude(pick_slot_face, amount=lower_depth - slot_extend_depth)
 for slot_index in range(slots_number):
     slot_bottom_z = slot_index * slot_spacing
     slot_center_z = slot_bottom_z + single_slot_space / 2.0
     keep_air += (
-        Pos(0.0, -lower_depth / 2.0, slot_center_z)
-        * Rotation(Z=90)
+        Pos(0.0, lower_depth / 2.0, slot_center_z)
+        * Rotation(Z=270)
         * Rotation(Y=90)
         * pick_slot_box
     )
@@ -88,9 +96,6 @@ def make_friction_style_part(thickness):
     face = Rectangle(total_length, total_width) - rect
     part += extrude(face, amount=-friction_depth)
     return part
-
-
-friction_part = make_friction_style_part(friction_part_thickness)
 
 # friction air
 friction_air = make_friction_style_part(friction_space)
@@ -120,7 +125,7 @@ body = chamfer(
 body -= remove_sketch_plane * air
 buckle_front_air_plane = Plane(
     removed_friction_air.faces().filter_by(Axis.Y).sort_by(Axis.Y)[1]
-)  # front inner
+) # front inner
 front_buckle_air = (
     buckle_front_air_plane * Pos(Y=friction_depth / 2.0 - buckle_edge_distance) * buckle
 )
@@ -144,6 +149,7 @@ upper_box_air = extrude(
     ),
 )
 upper_case = upper_box - upper_box_air
+friction_part = make_friction_style_part(friction_part_thickness)
 upper_case += friction_part
 upper_case = fillet(upper_case.edges().filter_by(Axis.Z), radius=fillet_radius)
 upper_case = fillet(upper_case.edges().group_by(Axis.Z)[-1], radius=fillet_radius)
@@ -163,6 +169,11 @@ upper_case.label = "case"
 assembly = Compound(label="assembly", children=[body, Pos(Z=lower_depth) * upper_case])
 
 show(assembly)
+
+print()
+total_volume = sum(part.volume for part in assembly.solids())
+print(f"volume: {total_volume} mm^3")
+
 export_stl(body, "outputs/body.stl")
 export_stl(Rotation(X=180) * upper_case, "outputs/case.stl")
 
