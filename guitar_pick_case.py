@@ -25,8 +25,8 @@ friction_chamfer_depth = (
 front_back_thickness = outer_thickness + front_back_reserve_space  # mm
 pick_thickness = 2.0  # mm
 slot_padding = precision  # mm
-slot_extend = 0.4 # mm
-slot_extend_depth = 2 # mm
+slot_extend = 0.4  # mm
+slot_extend_depth = 2  # mm
 single_slot_space = pick_thickness + slot_padding * 2
 single_slot_space_extended = single_slot_space + slot_extend * 2
 slot_corner_radius = (single_slot_space - precision) / 2.0
@@ -49,7 +49,7 @@ body_main = extrude(body_face, amount=lower_depth)
 body += body_main
 end_face_center = body.faces().sort_by(Axis.X).first.center()
 remove_sketch_plane = Plane(
-    origin=end_face_center + (front_back_thickness, 0, 0),
+    origin=end_face_center,
     x_dir=(0, 1, 0),
     z_dir=(1, 0, 0),
 )
@@ -66,26 +66,32 @@ air_curve = Spline(
 )
 air_curve_close = Line(air_curve @ 0, air_curve @ 1)
 air_face = make_face([air_curve, air_curve_close])
-air += extrude(air_face, amount=total_length - front_back_thickness * 2)
+air += extrude(air_face, amount=total_length)
 keep_air = Part()
 pick_slot_face = RectangleRounded(
     single_slot_space, total_width - outer_thickness * 2.0, radius=slot_corner_radius
 )
 pick_slot_extended_face = RectangleRounded(
-    single_slot_space_extended, total_width - outer_thickness * 2.0, radius=slot_corner_radius
+    single_slot_space_extended,
+    total_width - outer_thickness * 2.0,
+    radius=slot_corner_radius,
 )
-pick_slot_entry_sketch = pick_slot_extended_face + Pos(Z=slot_extend_depth) * pick_slot_face
+pick_slot_entry_sketch = (
+    pick_slot_extended_face + Pos(Z=slot_extend_depth) * pick_slot_face
+)
 pick_slot_entry = loft(pick_slot_entry_sketch)
-pick_slot_box = pick_slot_entry + Pos(Z=slot_extend_depth) * extrude(pick_slot_face, amount=lower_depth - slot_extend_depth)
+pick_slot_box = pick_slot_entry + Pos(Z=slot_extend_depth) * extrude(
+    pick_slot_face, amount=lower_depth - slot_extend_depth
+)
+slot_center_z = front_back_thickness + single_slot_space / 2.0
 for slot_index in range(slots_number):
-    slot_bottom_z = slot_index * slot_spacing
-    slot_center_z = slot_bottom_z + single_slot_space / 2.0
     keep_air += (
         Pos(0.0, lower_depth / 2.0, slot_center_z)
         * Rotation(Z=270)
         * Rotation(Y=90)
         * pick_slot_box
     )
+    slot_center_z += slot_spacing
 air &= keep_air
 
 
@@ -96,6 +102,7 @@ def make_friction_style_part(thickness):
     face = Rectangle(total_length, total_width) - rect
     part += extrude(face, amount=-friction_depth)
     return part
+
 
 # friction air
 friction_air = make_friction_style_part(friction_space)
@@ -125,7 +132,7 @@ body = chamfer(
 body -= remove_sketch_plane * air
 buckle_front_air_plane = Plane(
     removed_friction_air.faces().filter_by(Axis.Y).sort_by(Axis.Y)[1]
-) # front inner
+)  # front inner
 front_buckle_air = (
     buckle_front_air_plane * Pos(Y=friction_depth / 2.0 - buckle_edge_distance) * buckle
 )
