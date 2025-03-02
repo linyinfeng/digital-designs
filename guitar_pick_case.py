@@ -174,6 +174,7 @@ upper_case += front_buckle.mirror(Plane.XZ)
 body.label = "body"
 upper_case.label = "case"
 assembly = Compound(label="assembly", children=[body, Pos(Z=lower_depth) * upper_case])
+packed = pack([body, Rotation(X=180) * upper_case], padding=5, align_z=True)
 
 show(assembly)
 
@@ -183,6 +184,9 @@ print(f"volume: {total_volume} mm^3")
 
 export_stl(body, "outputs/body.stl")
 export_stl(Rotation(X=180) * upper_case, "outputs/case.stl")
+export_stl(assembly, "outputs/assembly.stl")
+export_stl(Compound(packed), "outputs/pack.stl")
 
 export_step(body, "outputs/body.step")
 export_step(Rotation(X=180) * upper_case, "outputs/case.step")
+export_step(assembly, "outputs/assembly.step")
