@@ -42,6 +42,8 @@ lower_depth = pick_depth * lower_ratio + outer_thickness
 friction_depth = buckle_edge_distance * 2 + friction_chamfer_depth
 upper_depth = pick_depth * upper_ratio + outer_thickness
 
+assert buckle_edge_distance * 2 > buckle_height, "incomplete buckle"
+assert lower_ratio > 0.5, "prevent pick fall off"
 
 body = Part()
 body_face = Rectangle(total_length, total_width)
