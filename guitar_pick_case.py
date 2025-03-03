@@ -6,12 +6,12 @@ slots_number = 15
 precision = 0.2  # mm
 thickness = 2  # mm
 friction_part_thickness = 2  # mm
-friction_margin = 0.4  # mm
+friction_margin = 0.2  # mm
 corner_radius = 3  # mm
 fillet_radius = 3  # mm
 buckle_length = 5  # mm
 buckle_height = 3  # mm
-buckle_depth = 1  # mm
+buckle_depth = 0.5  # mm
 buckle_fillet = 0.2  # mm
 buckle_angle = 45  # degree
 buckle_edge_distance = 3  # mm
@@ -39,7 +39,7 @@ total_width = pick_width + outer_thickness * 2
 lower_ratio = 0.6
 upper_ratio = 1 - lower_ratio
 lower_depth = pick_depth * lower_ratio + outer_thickness
-friction_depth = lower_depth * 0.6  # mm
+friction_depth = buckle_edge_distance * 2 + friction_chamfer_depth
 upper_depth = pick_depth * upper_ratio + outer_thickness
 
 
