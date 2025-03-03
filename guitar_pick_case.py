@@ -39,7 +39,7 @@ def guitar_pick_case(
     # body and case
     anti_pinch_fillet_radius=1,  # mm
     # friction part
-    friction_part_thickness=2,  # mm
+    friction_part_thickness=1.2,  # mm
     friction_gap=0.2,  # mm
     front_back_reserve_space=0.0,  # mm
     left_right_reserve_space=0.0,  # mm
@@ -77,7 +77,7 @@ def guitar_pick_case(
     lower_depth = pick_depth * lower_ratio + outer_thickness
     slot_depth = lower_depth - wall_thickness
     friction_depth = buckle_edge_distance * 2 + friction_chamfer_depth
-    upper_depth = pick_depth * upper_ratio + outer_thickness
+    upper_depth = pick_depth * upper_ratio + wall_thickness
 
     assert buckle_edge_distance * 2 > buckle_height, "incomplete buckle"
     assert lower_ratio > 0.5, "prevent pick fall off"
@@ -186,21 +186,7 @@ def guitar_pick_case(
 
     # upper case
     upper_case = Part()
-    upper_box = extrude(body_face, amount=upper_depth)
-    upper_box_air = extrude(
-        Rectangle(
-            total_length - friction_part_thickness * 2,
-            total_width - friction_part_thickness * 2,
-        ),
-        amount=upper_depth - outer_thickness,
-        taper=math.degrees(
-            math.atan(
-                (outer_thickness - friction_part_thickness)
-                / (upper_depth - outer_thickness)
-            )
-        ),
-    )
-    upper_case = upper_box - upper_box_air
+    upper_case = extrude(body_face, amount=upper_depth)
     friction_part = make_friction_style_part(friction_part_thickness)
     upper_case += friction_part
     upper_case = fillet(upper_case.edges().filter_by(Axis.Z), radius=body_fillet_radius)
@@ -211,6 +197,23 @@ def guitar_pick_case(
         rectangle_donut_outer_edges(upper_case.edges().group_by(Axis.Z)[0]),
         radius=anti_pinch_fillet_radius,
     )
+    upper_box_air = extrude(
+        Rectangle(
+            total_length - friction_part_thickness * 2,
+            total_width - friction_part_thickness * 2,
+        ),
+        amount=upper_depth - wall_thickness,
+        taper=math.degrees(
+            math.atan(
+                (outer_thickness - friction_part_thickness)
+                / (upper_depth - outer_thickness)
+            )
+        ),
+    )
+    upper_box_air = fillet(upper_box_air.edges().group_by(Axis.Z)[-2], radius=body_fillet_radius)
+    upper_box_air = fillet(upper_box_air.edges().group_by(Axis.Z)[-1], radius=body_fillet_radius)
+    upper_case = upper_case - upper_box_air
+
     buckle_front_mount_plane = Plane(
         friction_part.faces().filter_by(Axis.Y).sort_by(Axis.Y)[1]
     )  # front inner
