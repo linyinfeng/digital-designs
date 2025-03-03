@@ -3,6 +3,14 @@ import math
 import ocp_vscode as ov
 from ocp_vscode import show
 
+def slot_face(width, space):
+    pick_slot_face = Rectangle(
+        space, width - space,
+    )
+    pick_slot_end_circle = Circle(radius=space / 2.0)
+    pick_slot_face += Pos(pick_slot_face.edges().sort_by(Axis.Y)[0].center()) * pick_slot_end_circle
+    pick_slot_face += Pos(pick_slot_face.edges().sort_by(Axis.Y)[-1].center()) * pick_slot_end_circle
+    return pick_slot_face
 
 def rectangle_donut_outer_edges(edges, origin=(0, 0, 0)):
     return (
@@ -23,7 +31,7 @@ def guitar_pick_case(
     # slot
     wall_thickness=2,  # mm
     slot_padding=None,  # mm, default = precision
-    slot_extend=0.4,  # mm
+    slot_extend=0.5,  # mm
     slot_extend_depth=2,  # mm
     # body
     lower_ratio=0.6,
@@ -32,7 +40,7 @@ def guitar_pick_case(
     anti_pinch_fillet_radius=1,  # mm
     # friction part
     friction_part_thickness=2,  # mm
-    friction_margin=0.2,  # mm
+    friction_gap=0.2,  # mm
     front_back_reserve_space=0.0,  # mm
     left_right_reserve_space=0.0,  # mm
     # buckle
@@ -50,7 +58,7 @@ def guitar_pick_case(
     outer_thickness = (
         wall_thickness + friction_part_thickness + outer_extra_thickness
     )  # mm
-    friction_space_on_body = friction_part_thickness + friction_margin  # mm
+    friction_space_on_body = friction_part_thickness + friction_gap  # mm
     friction_chamfer_depth = (
         outer_thickness - friction_space_on_body - wall_thickness
     ) * 2.0  # atan(1 / 2) angle
@@ -58,7 +66,6 @@ def guitar_pick_case(
     left_right_thickness = outer_thickness + left_right_reserve_space  # mm
     single_slot_space = pick_thickness + slot_padding * 2
     single_slot_space_extended = single_slot_space + slot_extend * 2
-    slot_corner_radius = (single_slot_space - precision) / 2.0
     slot_spacing = single_slot_space + wall_thickness
     total_slots_length = (
         slots_number * single_slot_space + (slots_number - 1) * wall_thickness
@@ -68,6 +75,7 @@ def guitar_pick_case(
     total_width = slot_width + left_right_thickness * 2
     upper_ratio = 1 - lower_ratio
     lower_depth = pick_depth * lower_ratio + outer_thickness
+    slot_depth = lower_depth - wall_thickness
     friction_depth = buckle_edge_distance * 2 + friction_chamfer_depth
     upper_depth = pick_depth * upper_ratio + outer_thickness
 
@@ -85,7 +93,7 @@ def guitar_pick_case(
     # slots air
     slot_air = Part()
     air_sketch = Sketch()
-    slot_bottom_y = -(lower_depth / 2.0 - wall_thickness)
+    slot_bottom_y = lower_depth / 2.0 - slot_depth
     air_curve = Spline(
         [
             (slot_width / 2.0, lower_depth / 2.0),
@@ -96,21 +104,25 @@ def guitar_pick_case(
     air_sketch += make_face(air_curve.close())
     slot_air += extrude(air_sketch, amount=total_length)
     keep_slot_air = Part()
-    pick_slot_face = RectangleRounded(
-        single_slot_space, slot_width, radius=slot_corner_radius
-    )
+    pick_slot_face = slot_face(slot_width, single_slot_space)
+    sweep_curve = split(air_curve, bisect_by=Plane.YZ)
+    pick_slot_main = sweep((sweep_curve ^ 0) * Rotation(Z=-90) * Pos(Y=slot_width / 2.0) * split(pick_slot_face, bisect_by=Plane.XZ),
+                               sweep_curve,
+                               is_frenet=True)
+    pick_slot_main += pick_slot_main.mirror(Plane.YZ)
+    pick_slot_main = Pos(Y=-lower_depth / 2.0 + slot_extend_depth) * pick_slot_main
+    pick_slot_main = split(pick_slot_main, Plane.XZ)
+    pick_slot_main = Rotation(Z=90) * Rotation(X=-90) * pick_slot_main
+    pick_slot_entry_sketch = Sketch()
     pick_slot_extended_face = RectangleRounded(
         single_slot_space_extended,
         slot_width,
-        radius=slot_corner_radius,
+        radius=single_slot_space / 2.0,
     )
-    pick_slot_entry_sketch = (
-        pick_slot_extended_face + Pos(Z=slot_extend_depth) * pick_slot_face
-    )
+    pick_slot_entry_sketch += pick_slot_extended_face
+    pick_slot_entry_sketch += Pos(Z=slot_extend_depth) * pick_slot_main.faces().sort_by(Axis.Z)[0]
     pick_slot_entry = loft(pick_slot_entry_sketch)
-    pick_slot_box = pick_slot_entry + Pos(Z=slot_extend_depth) * extrude(
-        pick_slot_face, amount=lower_depth - slot_extend_depth
-    )
+    pick_slot_box = pick_slot_entry + Pos(Z=slot_extend_depth) * pick_slot_main
     slot_center_z = front_back_thickness + single_slot_space / 2.0
     for slot_index in range(slots_number):
         keep_slot_air += (
@@ -121,7 +133,6 @@ def guitar_pick_case(
         )
         slot_center_z += slot_spacing
     slot_air &= keep_slot_air
-    # slot_air = fillet(slot_air.edges().group_by(Axis.Y)[0], radius=0.3)
 
     # friction part
     def make_friction_style_part(thickness):
