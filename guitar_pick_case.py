@@ -3,65 +3,66 @@ import math
 import ocp_vscode as ov
 from ocp_vscode import show
 
-def rectangle_donut_outer_edges(edges, origin=(0,0,0)):
-    return (edges.filter_by(Axis.X).sort_by_distance(origin)[-2:] +
-           edges.filter_by(Axis.Y).sort_by_distance(origin)[-2:])
+
+def rectangle_donut_outer_edges(edges, origin=(0, 0, 0)):
+    return (
+        edges.filter_by(Axis.X).sort_by_distance(origin)[-2:]
+        + edges.filter_by(Axis.Y).sort_by_distance(origin)[-2:]
+    )
+
 
 def guitar_pick_case(
     # manufacturing
-    precision = 0.2, # mm
-
+    precision=0.2,  # mm
     # pick
-    pick_thickness = 2.0,  # mm
-    pick_width = 35.0,  # mm
-    pick_depth = 35.0,  # mm
-
+    pick_thickness=2.0,  # mm
+    pick_width=35.0,  # mm
+    pick_depth=35.0,  # mm
     # slot
-    slots_number = 15, # mm
-
+    slots_number=15,  # mm
     # slot
-    wall_thickness = 2,  # mm
-    slot_padding = None,  # mm, default = precision
-    slot_extend = 0.4,  # mm
-    slot_extend_depth = 2,  # mm
-
+    wall_thickness=2,  # mm
+    slot_padding=None,  # mm, default = precision
+    slot_extend=0.4,  # mm
+    slot_extend_depth=2,  # mm
     # body
-    lower_ratio = 0.6,
-    body_fillet_radius = 3,  # mm
-
+    lower_ratio=0.6,
+    body_fillet_radius=3,  # mm
     # body and case
-    anti_pinch_fillet_radius = 1, # mm
-
+    anti_pinch_fillet_radius=1,  # mm
     # friction part
-    friction_part_thickness = 2,  # mm
-    friction_margin = 0.2,  # mm
-    front_back_reserve_space = 0.0,  # mm
-    left_right_reserve_space = 0.0, # mm
-
+    friction_part_thickness=2,  # mm
+    friction_margin=0.2,  # mm
+    front_back_reserve_space=0.0,  # mm
+    left_right_reserve_space=0.0,  # mm
     # buckle
-    buckle_length = 5,  # mm
-    buckle_height = 3,  # mm
-    buckle_depth = 0.5,  # mm
-    buckle_fillet = 0.2,  # mm
-    buckle_angle = 45,  # degree
-    buckle_edge_distance = 3,  # mm
+    buckle_length=5,  # mm
+    buckle_height=3,  # mm
+    buckle_depth=0.5,  # mm
+    buckle_fillet=0.2,  # mm
+    buckle_angle=45,  # degree
+    buckle_edge_distance=3,  # mm
 ):
     if not slot_padding:
         slot_padding = precision
 
     outer_extra_thickness = buckle_depth  # mm
-    outer_thickness = wall_thickness + friction_part_thickness + outer_extra_thickness  # mm
+    outer_thickness = (
+        wall_thickness + friction_part_thickness + outer_extra_thickness
+    )  # mm
     friction_space_on_body = friction_part_thickness + friction_margin  # mm
     friction_chamfer_depth = (
         outer_thickness - friction_space_on_body - wall_thickness
     ) * 2.0  # atan(1 / 2) angle
     front_back_thickness = outer_thickness + front_back_reserve_space  # mm
-    left_right_thickness = outer_thickness + left_right_reserve_space # mm
+    left_right_thickness = outer_thickness + left_right_reserve_space  # mm
     single_slot_space = pick_thickness + slot_padding * 2
     single_slot_space_extended = single_slot_space + slot_extend * 2
     slot_corner_radius = (single_slot_space - precision) / 2.0
     slot_spacing = single_slot_space + wall_thickness
-    total_slots_length = slots_number * single_slot_space + (slots_number - 1) * wall_thickness
+    total_slots_length = (
+        slots_number * single_slot_space + (slots_number - 1) * wall_thickness
+    )
     slot_width = pick_width
     total_length = total_slots_length + front_back_thickness * 2
     total_width = slot_width + left_right_thickness * 2
@@ -122,7 +123,6 @@ def guitar_pick_case(
     slot_air &= keep_slot_air
     # slot_air = fillet(slot_air.edges().group_by(Axis.Y)[0], radius=0.3)
 
-
     # friction part
     def make_friction_style_part(thickness):
         part = Part()
@@ -130,7 +130,6 @@ def guitar_pick_case(
         face = Rectangle(total_length, total_width) - rect
         part += extrude(face, amount=-friction_depth)
         return part
-
 
     # friction air
     friction_air = make_friction_style_part(friction_space_on_body)
@@ -167,7 +166,9 @@ def guitar_pick_case(
         removed_friction_air.faces().filter_by(Axis.Y).sort_by(Axis.Y)[1]
     )  # front inner
     front_buckle_air = (
-        buckle_front_air_plane * Pos(Y=friction_depth / 2.0 - buckle_edge_distance) * buckle
+        buckle_front_air_plane
+        * Pos(Y=friction_depth / 2.0 - buckle_edge_distance)
+        * buckle
     )
     body -= front_buckle_air
     body -= front_buckle_air.mirror(Plane.XZ)
@@ -192,8 +193,13 @@ def guitar_pick_case(
     friction_part = make_friction_style_part(friction_part_thickness)
     upper_case += friction_part
     upper_case = fillet(upper_case.edges().filter_by(Axis.Z), radius=body_fillet_radius)
-    upper_case = fillet(upper_case.edges().group_by(Axis.Z)[-1], radius=body_fillet_radius)
-    upper_case = fillet(rectangle_donut_outer_edges(upper_case.edges().group_by(Axis.Z)[0]), radius=anti_pinch_fillet_radius)
+    upper_case = fillet(
+        upper_case.edges().group_by(Axis.Z)[-1], radius=body_fillet_radius
+    )
+    upper_case = fillet(
+        rectangle_donut_outer_edges(upper_case.edges().group_by(Axis.Z)[0]),
+        radius=anti_pinch_fillet_radius,
+    )
     buckle_front_mount_plane = Plane(
         friction_part.faces().filter_by(Axis.Y).sort_by(Axis.Y)[1]
     )  # front inner
@@ -207,7 +213,9 @@ def guitar_pick_case(
 
     body.label = "body"
     upper_case.label = "case"
-    assembly = Compound(label="assembly", children=[body, Pos(Z=lower_depth) * upper_case])
+    assembly = Compound(
+        label="assembly", children=[body, Pos(Z=lower_depth) * upper_case]
+    )
     packed = pack([body, Rotation(X=180) * upper_case], padding=5, align_z=True)
 
     ov.show_all()
@@ -227,9 +235,9 @@ def guitar_pick_case(
     return locals()
 
 
-
 def main():
     return guitar_pick_case()
+
 
 if __name__ == "__main__":
     globals().update(main())
