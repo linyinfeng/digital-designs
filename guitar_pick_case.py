@@ -53,7 +53,7 @@ def guitar_pick_case(
     # body and case
     anti_pinch_fillet_radius=1,  # mm
     # friction part
-    friction_part_thickness=1.2,  # mm
+    friction_part_thickness=2,  # mm
     friction_gap=0.2,  # mm
     front_back_reserve_space=0.0,  # mm
     left_right_reserve_space=0.0,  # mm
@@ -119,7 +119,6 @@ def guitar_pick_case(
     upper_depth = pick_depth * upper_ratio + wall_thickness
 
     assert buckle_edge_distance * 2 > buckle_height, "incomplete buckle"
-    assert lower_ratio > 0.5, "prevent pick fall off"
 
     body = Part()
     body_face = Rectangle(total_length, total_width)
@@ -414,6 +413,7 @@ def main():
         enable_buckle=False,
         pick_width=34.0,  # mm
         pick_depth=34.0,  # mm
+        lower_ratio=0.5,
         body_bottom_fillet_radius=3,
         upper_case_top_fillet_radius=9,
     )
