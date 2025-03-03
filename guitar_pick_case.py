@@ -4,14 +4,21 @@ from copy import copy
 import ocp_vscode as ov
 from ocp_vscode import show
 
+
 def slot_face(width, space):
     pick_slot_face = Rectangle(
-        space, width - space,
+        space,
+        width - space,
     )
     pick_slot_end_circle = Circle(radius=space / 2.0)
-    pick_slot_face += Pos(pick_slot_face.edges().sort_by(Axis.Y)[0].center()) * pick_slot_end_circle
-    pick_slot_face += Pos(pick_slot_face.edges().sort_by(Axis.Y)[-1].center()) * pick_slot_end_circle
+    pick_slot_face += (
+        Pos(pick_slot_face.edges().sort_by(Axis.Y)[0].center()) * pick_slot_end_circle
+    )
+    pick_slot_face += (
+        Pos(pick_slot_face.edges().sort_by(Axis.Y)[-1].center()) * pick_slot_end_circle
+    )
     return pick_slot_face
+
 
 def rectangle_donut_outer_edges(edges, origin=(0, 0, 0)):
     return (
@@ -29,7 +36,7 @@ def guitar_pick_case(
     pick_depth=35.0,  # mm
     # slot
     slots_number=15,  # mm
-    slot_width_ratio=1.0, # mm
+    slot_width_ratio=1.0,  # mm
     # slot
     wall_thickness=2,  # mm
     slot_padding=None,  # mm, default = precision
@@ -38,11 +45,11 @@ def guitar_pick_case(
     # body
     lower_ratio=0.6,
     body_fillet_radius=3,  # mm
-    body_bottom_fillet_radius=3, # mm
-    outer_extra_thickness=None, # mm, default = buckle_depth or 0
+    body_bottom_fillet_radius=3,  # mm
+    outer_extra_thickness=None,  # mm, default = buckle_depth or 0
     # case
-    upper_case_top_fillet_radius=3, # mm
-    upper_case_inner_fillet_radius=3, # mm
+    upper_case_top_fillet_radius=3,  # mm
+    upper_case_inner_fillet_radius=3,  # mm
     # body and case
     anti_pinch_fillet_radius=1,  # mm
     # friction part
@@ -52,14 +59,14 @@ def guitar_pick_case(
     left_right_reserve_space=0.0,  # mm
     # magnet
     enable_magnet=True,
-    magnet_radius=3.0 / 2.0, # mm
-    magnet_height=3.0, # mm
-    magnet_radius_padding=0.1, # mm
-    magnet_height_padding=0.2, # mm
-    magnet_slot_inner_fillet_radius=0.1, # mm
-    magnet_slot_outer_fillet_radius=0.2, # mm
-    magnet_fillet_radius=0.2, # mm
-    magnet_y_count = 3,
+    magnet_radius=3.0 / 2.0,  # mm
+    magnet_height=3.0,  # mm
+    magnet_radius_padding=0.1,  # mm
+    magnet_height_padding=0.2,  # mm
+    magnet_slot_inner_fillet_radius=0.1,  # mm
+    magnet_slot_outer_fillet_radius=0.2,  # mm
+    magnet_fillet_radius=0.2,  # mm
+    magnet_y_count=3,
     # buckle
     enable_buckle=True,
     buckle_length=5,  # mm
@@ -138,9 +145,14 @@ def guitar_pick_case(
     keep_slot_air = Part()
     pick_slot_face = slot_face(slot_width, single_slot_space)
     sweep_curve = split(air_curve, bisect_by=Plane.YZ)
-    pick_slot_main = sweep((sweep_curve ^ 0) * Rotation(Z=-90) * Pos(Y=slot_width / 2.0) * split(pick_slot_face, bisect_by=Plane.XZ),
-                               sweep_curve,
-                               is_frenet=True)
+    pick_slot_main = sweep(
+        (sweep_curve ^ 0)
+        * Rotation(Z=-90)
+        * Pos(Y=slot_width / 2.0)
+        * split(pick_slot_face, bisect_by=Plane.XZ),
+        sweep_curve,
+        is_frenet=True,
+    )
     pick_slot_main += pick_slot_main.mirror(Plane.YZ)
     pick_slot_main = Pos(Y=-lower_depth / 2.0 + slot_extend_depth) * pick_slot_main
     pick_slot_main = split(pick_slot_main, Plane.XZ)
@@ -152,7 +164,9 @@ def guitar_pick_case(
         radius=single_slot_space / 2.0,
     )
     pick_slot_entry_sketch += pick_slot_extended_face
-    pick_slot_entry_sketch += Pos(Z=slot_extend_depth) * pick_slot_main.faces().sort_by(Axis.Z)[0]
+    pick_slot_entry_sketch += (
+        Pos(Z=slot_extend_depth) * pick_slot_main.faces().sort_by(Axis.Z)[0]
+    )
     pick_slot_entry = loft(pick_slot_entry_sketch)
     pick_slot_box = pick_slot_entry + Pos(Z=slot_extend_depth) * pick_slot_main
     slot_center_z = front_back_thickness + single_slot_space / 2.0
@@ -182,18 +196,37 @@ def guitar_pick_case(
         magnet_slot = Part()
         magnet_slot = Cylinder(radius=magnet_slot_radius, height=magnet_slot_height)
         magnet_x_count = 2
-        magnet_slot_x_total_space = total_length - (friction_part_thickness + wall_thickness + magnet_slot_radius) * 2
-        magnet_slot_y_total_space = total_width - (friction_part_thickness + wall_thickness +  + magnet_slot_radius) * 2
-        magnet_locations = GridLocations(magnet_slot_x_total_space, magnet_slot_y_total_space / (magnet_y_count - 1), 2, magnet_y_count)
+        magnet_slot_x_total_space = (
+            total_length
+            - (friction_part_thickness + wall_thickness + magnet_slot_radius) * 2
+        )
+        magnet_slot_y_total_space = (
+            total_width
+            - (friction_part_thickness + wall_thickness + +magnet_slot_radius) * 2
+        )
+        magnet_locations = GridLocations(
+            magnet_slot_x_total_space,
+            magnet_slot_y_total_space / (magnet_y_count - 1),
+            2,
+            magnet_y_count,
+        )
         magnet_total_number = magnet_x_count * magnet_y_count
 
         magnet = Part()
         magnet.label = "magnet"
-        magnet.color = Color(0.75, 0.75, 0.75) # silver
+        magnet.color = Color(0.75, 0.75, 0.75)  # silver
         magnet = Cylinder(radius=magnet_radius, height=magnet_height)
         magnet = fillet(magnet.edges(), radius=magnet_fillet_radius)
-        RigidJoint(label="bottom", to_part=magnet, joint_location=Location(magnet.faces().sort_by(Axis.Z)[0].center()))
-        RigidJoint(label="top", to_part=magnet, joint_location=Location(magnet.faces().sort_by(Axis.Z)[-1].center()))
+        RigidJoint(
+            label="bottom",
+            to_part=magnet,
+            joint_location=Location(magnet.faces().sort_by(Axis.Z)[0].center()),
+        )
+        RigidJoint(
+            label="top",
+            to_part=magnet,
+            joint_location=Location(magnet.faces().sort_by(Axis.Z)[-1].center()),
+        )
 
     # buckle
     if enable_buckle:
@@ -236,12 +269,26 @@ def guitar_pick_case(
         body -= front_buckle_air.mirror(Plane.XZ)
     if enable_magnet:
         edge_snapshot = body.edges()
-        body_magnet_slot = fillet(magnet_slot.edges().group_by(Axis.Z)[0], radius=magnet_slot_inner_fillet_radius)
-        body -= Pos(Z=lower_depth - magnet_slot_height / 2.0) * magnet_locations * body_magnet_slot
-        body = fillet((body.edges() - edge_snapshot).group_by(Axis.Z)[-1], radius=magnet_slot_outer_fillet_radius)
+        body_magnet_slot = fillet(
+            magnet_slot.edges().group_by(Axis.Z)[0],
+            radius=magnet_slot_inner_fillet_radius,
+        )
+        body -= (
+            Pos(Z=lower_depth - magnet_slot_height / 2.0)
+            * magnet_locations
+            * body_magnet_slot
+        )
+        body = fillet(
+            (body.edges() - edge_snapshot).group_by(Axis.Z)[-1],
+            radius=magnet_slot_outer_fillet_radius,
+        )
         magnet_location_index = 0
         for location in Pos(Z=lower_depth - magnet_slot_height) * magnet_locations:
-            RigidJoint(f"magnet_mount_{magnet_location_index}", to_part=body, joint_location=location)
+            RigidJoint(
+                f"magnet_mount_{magnet_location_index}",
+                to_part=body,
+                joint_location=location,
+            )
             magnet_location_index += 1
     RigidJoint("case_mount", to_part=body, joint_location=Pos(Z=lower_depth))
 
@@ -265,12 +312,18 @@ def guitar_pick_case(
         ),
         amount=upper_depth - wall_thickness,
     )
-    upper_case_air = fillet(upper_case_air.edges().group_by(Axis.Z)[-2], radius=body_fillet_radius)
-    upper_case_air = fillet(upper_case_air.edges().group_by(Axis.Z)[-1], radius=body_fillet_radius)
+    upper_case_air = fillet(
+        upper_case_air.edges().group_by(Axis.Z)[-2], radius=body_fillet_radius
+    )
+    upper_case_air = fillet(
+        upper_case_air.edges().group_by(Axis.Z)[-1], radius=body_fillet_radius
+    )
     edge_snapshot = upper_case.edges()
     upper_case = upper_case - upper_case_air
-    upper_case = fillet((upper_case.edges() - edge_snapshot).group_by(Axis.Z)[0], radius=upper_case_inner_fillet_radius)
-
+    upper_case = fillet(
+        (upper_case.edges() - edge_snapshot).group_by(Axis.Z)[0],
+        radius=upper_case_inner_fillet_radius,
+    )
 
     if enable_buckle:
         buckle_front_mount_plane = Plane(
@@ -285,12 +338,24 @@ def guitar_pick_case(
         upper_case += front_buckle.mirror(Plane.XZ)
     if enable_magnet:
         edge_snapshot = upper_case.edges()
-        upper_case_magnet_slot = fillet(magnet_slot.edges().group_by(Axis.Z)[-1], radius=magnet_slot_inner_fillet_radius)
-        upper_case -= Pos(Z=magnet_slot_height / 2.0) * magnet_locations * upper_case_magnet_slot
-        upper_case = fillet((upper_case.edges() - edge_snapshot).group_by(Axis.Z)[0], radius=magnet_slot_outer_fillet_radius)
+        upper_case_magnet_slot = fillet(
+            magnet_slot.edges().group_by(Axis.Z)[-1],
+            radius=magnet_slot_inner_fillet_radius,
+        )
+        upper_case -= (
+            Pos(Z=magnet_slot_height / 2.0) * magnet_locations * upper_case_magnet_slot
+        )
+        upper_case = fillet(
+            (upper_case.edges() - edge_snapshot).group_by(Axis.Z)[0],
+            radius=magnet_slot_outer_fillet_radius,
+        )
         magnet_location_index = 0
         for location in Pos(Z=magnet_slot_height) * magnet_locations:
-            RigidJoint(f"magnet_mount_{magnet_location_index}", to_part=upper_case, joint_location=location)
+            RigidJoint(
+                f"magnet_mount_{magnet_location_index}",
+                to_part=upper_case,
+                joint_location=location,
+            )
             magnet_location_index += 1
     LinearJoint("bottom", to_part=upper_case, axis=Axis.Z, linear_range=(-math.inf, 0))
 
@@ -298,24 +363,32 @@ def guitar_pick_case(
     upper_case.label = "case"
     assembly_body = copy(body)
     assembly_upper_case = copy(upper_case)
-    assembly_body.joints["case_mount"].connect_to(assembly_upper_case.joints["bottom"], position=0)
+    assembly_body.joints["case_mount"].connect_to(
+        assembly_upper_case.joints["bottom"], position=0
+    )
     assembly_body_magnets = []
     assembly_case_magnets = []
     if enable_magnet:
         for i in range(magnet_total_number):
             body_magnet = copy(magnet)
             body_magnet.label = f"body_magnet_{i}"
-            assembly_body.joints[f"magnet_mount_{i}"].connect_to(body_magnet.joints["bottom"])
+            assembly_body.joints[f"magnet_mount_{i}"].connect_to(
+                body_magnet.joints["bottom"]
+            )
             assembly_body_magnets.append(body_magnet)
             case_magnet = copy(magnet)
             case_magnet.label = f"case_magnet_{i}"
-            assembly_upper_case.joints[f"magnet_mount_{i}"].connect_to(case_magnet.joints["top"])
+            assembly_upper_case.joints[f"magnet_mount_{i}"].connect_to(
+                case_magnet.joints["top"]
+            )
             assembly_case_magnets.append(case_magnet)
-    full_body = Compound(label="full_body", children=[assembly_body] + assembly_body_magnets)
-    full_upper_case = Compound(label="full_upper_case", children=[assembly_upper_case] + assembly_case_magnets)
-    assembly = Compound(
-        label="assembly", children=[full_body, full_upper_case]
+    full_body = Compound(
+        label="full_body", children=[assembly_body] + assembly_body_magnets
     )
+    full_upper_case = Compound(
+        label="full_upper_case", children=[assembly_upper_case] + assembly_case_magnets
+    )
+    assembly = Compound(label="assembly", children=[full_body, full_upper_case])
     packed = pack([body, Rotation(X=180) * upper_case], padding=5, align_z=True)
 
     ov.show_all()
@@ -342,7 +415,8 @@ def main():
         pick_width=34.0,  # mm
         pick_depth=34.0,  # mm
         body_bottom_fillet_radius=3,
-        upper_case_top_fillet_radius=9)
+        upper_case_top_fillet_radius=9,
+    )
 
 
 if __name__ == "__main__":
