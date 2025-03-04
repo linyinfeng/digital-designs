@@ -393,7 +393,7 @@ def guitar_pick_case(
 
     if enable_watermark:
         watermark_line1 = f"Yinfeng's"
-        watermark_line2 = f"Sample {datetime.datetime.now()}"
+        watermark_line2 = f"Prototype {datetime.datetime.now()}"
         line_spacing = 7
         watermark = Part()
         watermark_depth = wall_thickness / 2
