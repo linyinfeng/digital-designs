@@ -3,20 +3,30 @@ import math
 from copy import copy
 import ocp_vscode as ov
 from ocp_vscode import show
+import datetime
 
 
-def slot_face(width, space):
-    pick_slot_face = Rectangle(
-        space,
-        width - space,
+def slot_sweep_face(width, space, *, slot_tilt, slot_open):
+    pick_slot_face = Sketch()
+    tilted_space = space * math.cos(math.radians(slot_tilt))
+    rect = Rectangle(
+        tilted_space,
+        width - tilted_space,
     )
-    pick_slot_end_circle = Circle(radius=space / 2.0)
-    pick_slot_face += (
+    pick_slot_face += rect
+    pick_slot_end_circle = Circle(radius=tilted_space / 2.0)
+    end_circle_left = (
         Pos(pick_slot_face.edges().sort_by(Axis.Y)[0].center()) * pick_slot_end_circle
     )
-    pick_slot_face += (
+    end_circle_right = (
         Pos(pick_slot_face.edges().sort_by(Axis.Y)[-1].center()) * pick_slot_end_circle
     )
+    pick_slot_face += end_circle_left
+    pick_slot_face += end_circle_right
+    open_at = rect.vertices().group_by(Axis.X)[0]
+    arc_sagitta = slot_open * math.cos(math.radians(slot_tilt))
+    arc = SagittaArc(open_at.first, open_at.last, arc_sagitta)
+    pick_slot_face += make_face(arc.close())
     return pick_slot_face
 
 
@@ -35,18 +45,23 @@ def guitar_pick_case(
     pick_width=35.0,  # mm
     pick_depth=35.0,  # mm
     # slot
-    slots_number=15,  # mm
+    slots_per_row=15,  # mm
+    slots_rows=2,
     slot_width_ratio=1.0,  # mm
+    slot_row_extra_spacing=5,  # mm
+    slot_tilt=30,  # mm
+    slot_open=1,  # mm
     # slot
     wall_thickness=2,  # mm
     slot_padding=None,  # mm, default = precision
-    slot_extend=0.5,  # mm
-    slot_extend_depth=2,  # mm
+    slot_open_fillet=0.5,  # mm
     # body
     lower_ratio=0.6,
     body_fillet_radius=3,  # mm
     body_bottom_fillet_radius=3,  # mm
     outer_extra_thickness=None,  # mm, default = buckle_depth or 0
+    friction_chamfer=0.5,  # mm
+    friction_chamfer_depth=1,  # mm
     # case
     upper_case_top_fillet_radius=3,  # mm
     upper_case_inner_fillet_radius=3,  # mm
@@ -75,6 +90,8 @@ def guitar_pick_case(
     buckle_fillet=0.2,  # mm
     buckle_angle=45,  # degree
     buckle_edge_distance=2,  # mm
+    # water mark
+    enable_watermark=False,
 ):
     if not slot_padding:
         slot_padding = precision
@@ -94,90 +111,101 @@ def guitar_pick_case(
         wall_thickness + friction_part_thickness + outer_extra_thickness
     )  # mm
     friction_space_on_body = friction_part_thickness + friction_gap  # mm
-    friction_chamfer = slot_extend
-    friction_chamfer_depth = slot_extend_depth
     front_back_thickness = outer_thickness + front_back_reserve_space  # mm
     left_right_thickness = outer_thickness + left_right_reserve_space  # mm
-    single_slot_space = pick_thickness + slot_padding * 2
-    single_slot_space_extended = single_slot_space + slot_extend * 2
+    single_slot_main_space = pick_thickness + slot_padding * 2
+    single_slot_space = single_slot_main_space + slot_open
     slot_spacing = single_slot_space + wall_thickness
-    total_slots_length = (
-        slots_number * single_slot_space + (slots_number - 1) * wall_thickness
-    )
     slot_width = pick_width * slot_width_ratio
-    total_length = total_slots_length + front_back_thickness * 2
-    total_width = pick_width + left_right_thickness * 2
     upper_ratio = 1 - lower_ratio
-    lower_depth = pick_depth * lower_ratio + outer_thickness
-    slot_depth = lower_depth - wall_thickness
+    slot_height = pick_depth * math.cos(math.radians(slot_tilt))
+    slot_lower_height = slot_height * lower_ratio
+    slot_front_length = lower_ratio * pick_depth * math.sin(math.radians(slot_tilt))
+    pick_typical_tilt = math.degrees(
+        math.atan2(slot_open + slot_front_length, slot_lower_height)
+    )
+    pick_back_length = (
+        upper_ratio * pick_depth * math.sin(math.radians(pick_typical_tilt))
+    )
+    total_slots_length = (
+        slots_per_row * single_slot_space
+        + (slots_per_row - 1) * wall_thickness
+        + pick_back_length
+    )
+    slots_raw_spacing = pick_width + wall_thickness + slot_row_extra_spacing
+    total_slots_width = pick_width * slots_rows + (
+        wall_thickness + slot_row_extra_spacing
+    ) * (slots_rows - 1)
+    total_length = (
+        total_slots_length
+        + front_back_thickness
+        + max(slot_front_length + wall_thickness, front_back_thickness)
+    )
+    total_width = total_slots_width + left_right_thickness * 2
+    lower_height = slot_lower_height + wall_thickness
+    upper_height = slot_height * upper_ratio + wall_thickness
     if enable_buckle:
         friction_depth = buckle_edge_distance * 2 + friction_chamfer_depth
     elif enable_magnet:
         friction_depth = friction_chamfer_depth * 2
     else:
-        friction_depth = lower_depth * 0.5
-    upper_depth = pick_depth * upper_ratio + wall_thickness
+        friction_depth = lower_height * 0.5
 
     assert buckle_edge_distance * 2 > buckle_height, "incomplete buckle"
+    assert (
+        upper_case_inner_fillet_radius * 2 < wall_thickness + slot_row_extra_spacing
+    ), "invalid case inner fillet"
 
     body = Part()
     body_face = Rectangle(total_length, total_width)
-    body_main = extrude(body_face, amount=lower_depth)
+    body_main = extrude(body_face, amount=lower_height)
     body += body_main
-    remove_slot_air_face = body.faces().sort_by(Axis.X).first
-    remove_slot_air_plane = Plane(remove_slot_air_face).rotated((0, 180, 0))
     body_top_face = body.faces().sort_by(Axis.Z).last
 
     # slots air
-    slot_air = Part()
-    air_sketch = Sketch()
-    slot_bottom_y = lower_depth / 2.0 - slot_depth
+    slots_row_air = Part()
+    pick_slot_air = Part()
+    slot_tilt_reserve_height = (
+        math.sin(math.radians(slot_tilt)) * single_slot_main_space / 2.0
+    )
     air_curve = Spline(
         [
-            (slot_width / 2.0, lower_depth / 2.0),
-            (0, slot_bottom_y),
-            (-(slot_width / 2.0), lower_depth / 2.0),
+            (-slot_width / 2.0, -slot_tilt_reserve_height),
+            # (-slot_width / 2.0, 0),
+            (0, pick_depth * lower_ratio),
+            # (slot_width / 2.0, 0),
+            (slot_width / 2.0, -slot_tilt_reserve_height),
         ],
     )
-    air_sketch += make_face(air_curve.close())
-    slot_air += extrude(air_sketch, amount=total_length)
-    keep_slot_air = Part()
-    pick_slot_face = slot_face(slot_width, single_slot_space)
-    sweep_curve = split(air_curve, bisect_by=Plane.YZ)
-    pick_slot_main = sweep(
-        (sweep_curve ^ 0)
-        * Rotation(Z=-90)
+    pick_slot_face = slot_sweep_face(
+        slot_width, single_slot_main_space, slot_tilt=slot_tilt, slot_open=slot_open
+    )
+    sweep_face = (
+        Rotation(Z=-90)
         * Pos(Y=slot_width / 2.0)
-        * split(pick_slot_face, bisect_by=Plane.XZ),
+        * split(pick_slot_face, bisect_by=Plane.XZ)
+    )
+    sweep_curve = (
+        Rotation(Z=-90) * Rotation(X=-90) * split(air_curve, bisect_by=Plane.YZ)
+    )
+    swept = sweep(
+        (sweep_curve ^ 0) * sweep_face,
         sweep_curve,
         is_frenet=True,
     )
-    pick_slot_main += pick_slot_main.mirror(Plane.YZ)
-    pick_slot_main = Pos(Y=-lower_depth / 2.0 + slot_extend_depth) * pick_slot_main
-    pick_slot_main = split(pick_slot_main, Plane.XZ)
-    pick_slot_main = Rotation(Z=90) * Rotation(X=-90) * pick_slot_main
-    pick_slot_entry_sketch = Sketch()
-    pick_slot_extended_face = RectangleRounded(
-        single_slot_space_extended,
-        slot_width,
-        radius=single_slot_space / 2.0,
+    swept = split(swept, Plane.XZ)
+    pick_slot_air += Rotation(Y=-slot_tilt) * (swept + swept.mirror(Plane.XZ))
+    pick_slot_air = split(pick_slot_air, Plane.XY, keep=Keep.BOTTOM)
+    slot_center_x = (
+        front_back_thickness + pick_back_length + single_slot_space / 2 + slot_open
     )
-    pick_slot_entry_sketch += pick_slot_extended_face
-    pick_slot_entry_sketch += (
-        Pos(Z=slot_extend_depth) * pick_slot_main.faces().sort_by(Axis.Z)[0]
-    )
-    pick_slot_entry = loft(pick_slot_entry_sketch)
-    pick_slot_box = pick_slot_entry + Pos(Z=slot_extend_depth) * pick_slot_main
-    slot_center_z = front_back_thickness + single_slot_space / 2.0
-    for slot_index in range(slots_number):
-        keep_slot_air += (
-            Pos(0.0, lower_depth / 2.0, slot_center_z)
-            * Rotation(Z=270)
-            * Rotation(Y=90)
-            * pick_slot_box
-        )
-        slot_center_z += slot_spacing
-    slot_air &= keep_slot_air
+    for slot_index in range(slots_per_row):
+        slots_row_air += Pos(X=slot_center_x) * pick_slot_air
+        slot_center_x += slot_spacing
+
+    slots_rows_air = Part()
+    row_locations = GridLocations(0, slots_raw_spacing, 1, slots_rows)
+    slots_rows_air += row_locations * slots_row_air
 
     # friction part
     def make_friction_style_part(thickness):
@@ -253,8 +281,11 @@ def guitar_pick_case(
         length2=friction_chamfer,
         length=friction_chamfer_depth,
     )
-    remove_slot_air = remove_slot_air_plane * slot_air
+    remove_slot_air = Pos(X=-total_length / 2.0, Z=lower_height) * slots_rows_air
+    edge_snapshot = body.edges()
     body -= remove_slot_air
+    slot_open_edges = (body.edges() - edge_snapshot).group_by(Axis.Z)[-1]
+    body = fillet(slot_open_edges, radius=slot_open_fillet)
     if enable_buckle:
         buckle_front_air_plane = Plane(
             removed_friction_air.faces().filter_by(Axis.Y).sort_by(Axis.Y)[1]
@@ -273,7 +304,7 @@ def guitar_pick_case(
             radius=magnet_slot_inner_fillet_radius,
         )
         body -= (
-            Pos(Z=lower_depth - magnet_slot_height / 2.0)
+            Pos(Z=lower_height - magnet_slot_height / 2.0)
             * magnet_locations
             * body_magnet_slot
         )
@@ -282,18 +313,18 @@ def guitar_pick_case(
             radius=magnet_slot_outer_fillet_radius,
         )
         magnet_location_index = 0
-        for location in Pos(Z=lower_depth - magnet_slot_height) * magnet_locations:
+        for location in Pos(Z=lower_height - magnet_slot_height) * magnet_locations:
             RigidJoint(
                 f"magnet_mount_{magnet_location_index}",
                 to_part=body,
                 joint_location=location,
             )
             magnet_location_index += 1
-    RigidJoint("case_mount", to_part=body, joint_location=Pos(Z=lower_depth))
+    RigidJoint("case_mount", to_part=body, joint_location=Pos(Z=lower_height))
 
     # upper case
     upper_case = Part()
-    upper_case = extrude(body_face, amount=upper_depth)
+    upper_case = extrude(body_face, amount=upper_height)
     friction_part = make_friction_style_part(friction_part_thickness)
     upper_case += friction_part
     upper_case = fillet(upper_case.edges().filter_by(Axis.Z), radius=body_fillet_radius)
@@ -304,19 +335,21 @@ def guitar_pick_case(
         rectangle_donut_outer_edges(upper_case.edges().group_by(Axis.Z)[0]),
         radius=anti_pinch_fillet_radius,
     )
-    upper_case_air = extrude(
+    upper_case_air = Part()
+    upper_case_row_air = extrude(
         Rectangle(
             total_length - front_back_thickness * 2,
-            total_width - left_right_thickness * 2,
+            slot_width,
         ),
-        amount=upper_depth - wall_thickness,
+        amount=upper_height - wall_thickness,
     )
-    upper_case_air = fillet(
-        upper_case_air.edges().group_by(Axis.Z)[-2], radius=body_fillet_radius
+    upper_case_row_air = fillet(
+        upper_case_row_air.edges().group_by(Axis.Z)[-2], radius=body_fillet_radius
     )
-    upper_case_air = fillet(
-        upper_case_air.edges().group_by(Axis.Z)[-1], radius=body_fillet_radius
+    upper_case_row_air = fillet(
+        upper_case_row_air.edges().group_by(Axis.Z)[-1], radius=body_fillet_radius
     )
+    upper_case_air += row_locations * upper_case_row_air
     edge_snapshot = upper_case.edges()
     upper_case = upper_case - upper_case_air
     upper_case = fillet(
@@ -358,6 +391,21 @@ def guitar_pick_case(
             magnet_location_index += 1
     LinearJoint("bottom", to_part=upper_case, axis=Axis.Z, linear_range=(-math.inf, 0))
 
+    if enable_watermark:
+        watermark_line1 = f"Yinfeng's"
+        watermark_line2 = f"Sample {datetime.datetime.now()}"
+        line_spacing = 7
+        watermark = Part()
+        watermark_depth = wall_thickness / 2
+        watermark += Pos(Y=-line_spacing / 2) * extrude(
+            Text(watermark_line2, font_size=5), amount=watermark_depth
+        )
+        watermark += Pos(Y=line_spacing / 2) * extrude(
+            Text(watermark_line1, font_size=5), amount=watermark_depth
+        )
+        body -= Pos(Z=watermark_depth) * Rotation(X=180) * watermark
+        upper_case -= Pos(Z=upper_height - watermark_depth) * watermark
+
     body.label = "body"
     upper_case.label = "case"
     assembly_body = copy(body)
@@ -390,7 +438,7 @@ def guitar_pick_case(
     assembly = Compound(label="assembly", children=[full_body, full_upper_case])
     packed = pack([body, Rotation(X=180) * upper_case], padding=5, align_z=True)
 
-    ov.show_all()
+    ov.show(assembly)
 
     print()
     total_volume = sum(part.volume for part in assembly.solids())
@@ -400,22 +448,27 @@ def guitar_pick_case(
     export_stl(Rotation(X=180) * upper_case, "outputs/case.stl")
     export_stl(assembly, "outputs/assembly.stl")
     export_stl(Compound(packed), "outputs/pack.stl")
-
-    export_step(body, "outputs/body.step")
-    export_step(Rotation(X=180) * upper_case, "outputs/case.step")
-    export_step(assembly, "outputs/assembly.step")
     return locals()
 
 
 def main():
     return guitar_pick_case(
-        enable_magnet=True,
-        enable_buckle=False,
+        slots_per_row=15,
+        slots_rows=2,
         pick_width=34.0,  # mm
         pick_depth=34.0,  # mm
+        pick_thickness=2.0,  # mm
+        slot_padding=0.0,  # mm
+        slot_tilt=30,
+        slot_open=1,  # mm
+        slot_open_fillet=0.5,  # mm
         lower_ratio=0.5,
         body_bottom_fillet_radius=3,
         upper_case_top_fillet_radius=9,
+        enable_magnet=True,
+        magnet_y_count=3,
+        enable_buckle=False,
+        enable_watermark=True,
     )
 
 
