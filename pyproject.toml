@@ -1,0 +1,13 @@
+[tool.poetry]
+package-mode = false
+
+[project]
+name = "models"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "build123d @ git+https://github.com/gumyr/build123d",
+    "OCP",
+    "ocp_vscode",
+    "ocp_tessellate",
+    "ipykernel",
+]
