@@ -94,13 +94,6 @@ def guitar_pick_case(
     buckle_fillet=0.2,  # mm
     buckle_angle=45,  # degree
     buckle_edge_distance=2,  # mm
-    # connect slot
-    connect_slot_width=2,  # mm
-    connect_slot_padding=0.1,  # mm
-    connect_slot_positions=None, # mm
-    connect_slot_height=None,
-    connect_slot_wall_thickness=1,  #mm
-    connect_slot_fillet=0.5,  # mm
     # water mark
     enable_watermark=False,
 ):
@@ -164,18 +157,6 @@ def guitar_pick_case(
         friction_depth = friction_chamfer_depth * 2
     else:
         friction_depth = lower_height * 0.5
-
-    if not connect_slot_height:
-        connect_slot_height = (lower_height -
-          max(anti_pinch_fillet_radius + friction_depth, magnet_height) -
-          body_bottom_fillet_radius) - 2 * connect_slot_wall_thickness
-    if not connect_slot_positions:
-        first_position = body_bottom_fillet_radius + connect_slot_wall_thickness + connect_slot_width / 2
-        second_position = front_back_thickness + pick_back_length - connect_slot_wall_thickness + connect_slot_width / 2
-        connect_slot_positions = [
-            first_position,
-            second_position
-        ]
 
     assert buckle_edge_distance * 2 > buckle_height, "incomplete buckle"
     assert (
@@ -294,12 +275,6 @@ def guitar_pick_case(
         )
         buckle = fillet(buckle.edges().group_by(Axis.Z)[-1], radius=buckle_fillet)
 
-    # connect slot
-    connect_slot = Part()
-    connect_slot_face = Rotation(Z=90) * Rotation(Y=90) * SlotOverall(connect_slot_height, connect_slot_width)
-    connect_slot += extrude(connect_slot_face, amount=total_width / 2.0)
-    connect_slot += extrude(connect_slot_face, amount=-total_width / 2.0)
-
     # finish body
     removed_friction_air = Plane(body_top_face) * friction_air
     body -= removed_friction_air
@@ -345,11 +320,6 @@ def guitar_pick_case(
             radius=magnet_slot_outer_fillet_radius,
         )
         magnet_location_index = 0
-    edge_snapshot = body.edges()
-    for position in connect_slot_positions:
-        body -= Pos(X=-total_length / 2 + position, Z=body_bottom_fillet_radius + connect_slot_wall_thickness + connect_slot_height / 2) * connect_slot
-    new_edges = body.edges() - edge_snapshot
-    body = fillet(new_edges - new_edges.filter_by(Axis.Y), radius=connect_slot_fillet)
     if enable_magnet:
         for location in Pos(Z=lower_height - magnet_slot_height) * magnet_locations:
             RigidJoint(
