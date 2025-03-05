@@ -4,6 +4,7 @@ from copy import copy
 import ocp_vscode as ov
 from ocp_vscode import show
 import datetime
+import os
 
 
 def slot_sweep_face(width, space, *, slot_tilt, slot_open):
@@ -38,12 +39,15 @@ def rectangle_donut_outer_edges(edges, origin=(0, 0, 0)):
 
 
 def guitar_pick_case(
+    # output
+    auto_code_name=False,
+    code_name="prototype",
     # manufacturing
     precision=0.2,  # mm
     # pick
-    pick_thickness=2.0,  # mm
-    pick_width=35.0,  # mm
-    pick_depth=35.0,  # mm
+    pick_thickness=2,  # mm
+    pick_width=35,  # mm
+    pick_depth=35,  # mm
     # slot
     slots_per_row=15,  # mm
     slots_rows=2,
@@ -70,8 +74,8 @@ def guitar_pick_case(
     # friction part
     friction_part_thickness=2,  # mm
     friction_gap=0.2,  # mm
-    front_back_reserve_space=0.0,  # mm
-    left_right_reserve_space=0.0,  # mm
+    front_back_reserve_space=0,  # mm
+    left_right_reserve_space=0,  # mm
     # magnet
     enable_magnet=True,
     magnet_radius=3.0 / 2.0,  # mm
@@ -90,9 +94,19 @@ def guitar_pick_case(
     buckle_fillet=0.2,  # mm
     buckle_angle=45,  # degree
     buckle_edge_distance=2,  # mm
+    # connect slot
+    connect_slot_width=2,  # mm
+    connect_slot_padding=0.1,  # mm
+    connect_slot_positions=None, # mm
+    connect_slot_height=None,
+    connect_slot_wall_thickness=1,  #mm
+    connect_slot_fillet=0.5,  # mm
     # water mark
     enable_watermark=False,
 ):
+    if auto_code_name:
+        code_name=f"{slots_rows}x{slots_per_row}-w{pick_width}d{pick_width}t{pick_thickness}-t{slot_tilt}"
+
     if not slot_padding:
         slot_padding = precision
 
@@ -150,6 +164,18 @@ def guitar_pick_case(
         friction_depth = friction_chamfer_depth * 2
     else:
         friction_depth = lower_height * 0.5
+
+    if not connect_slot_height:
+        connect_slot_height = (lower_height -
+          max(anti_pinch_fillet_radius + friction_depth, magnet_height) -
+          body_bottom_fillet_radius) - 2 * connect_slot_wall_thickness
+    if not connect_slot_positions:
+        first_position = body_bottom_fillet_radius + connect_slot_wall_thickness + connect_slot_width / 2
+        second_position = front_back_thickness + pick_back_length - connect_slot_wall_thickness + connect_slot_width / 2
+        connect_slot_positions = [
+            first_position,
+            second_position
+        ]
 
     assert buckle_edge_distance * 2 > buckle_height, "incomplete buckle"
     assert (
@@ -268,6 +294,12 @@ def guitar_pick_case(
         )
         buckle = fillet(buckle.edges().group_by(Axis.Z)[-1], radius=buckle_fillet)
 
+    # connect slot
+    connect_slot = Part()
+    connect_slot_face = Rotation(Z=90) * Rotation(Y=90) * SlotOverall(connect_slot_height, connect_slot_width)
+    connect_slot += extrude(connect_slot_face, amount=total_width / 2.0)
+    connect_slot += extrude(connect_slot_face, amount=-total_width / 2.0)
+
     # finish body
     removed_friction_air = Plane(body_top_face) * friction_air
     body -= removed_friction_air
@@ -313,6 +345,12 @@ def guitar_pick_case(
             radius=magnet_slot_outer_fillet_radius,
         )
         magnet_location_index = 0
+    edge_snapshot = body.edges()
+    for position in connect_slot_positions:
+        body -= Pos(X=-total_length / 2 + position, Z=body_bottom_fillet_radius + connect_slot_wall_thickness + connect_slot_height / 2) * connect_slot
+    new_edges = body.edges() - edge_snapshot
+    body = fillet(new_edges - new_edges.filter_by(Axis.Y), radius=connect_slot_fillet)
+    if enable_magnet:
         for location in Pos(Z=lower_height - magnet_slot_height) * magnet_locations:
             RigidJoint(
                 f"magnet_mount_{magnet_location_index}",
@@ -444,21 +482,24 @@ def guitar_pick_case(
     total_volume = sum(part.volume for part in assembly.solids())
     print(f"volume: {total_volume} mm^3")
 
-    export_stl(body, "outputs/body.stl")
-    export_stl(Rotation(X=180) * upper_case, "outputs/case.stl")
-    export_stl(assembly, "outputs/assembly.stl")
-    export_stl(Compound(packed), "outputs/pack.stl")
+    output_directory = f"outputs/{code_name}"
+    os.makedirs(output_directory, exist_ok=True)
+    export_stl(body, f"{output_directory}/body-{code_name}.stl")
+    export_stl(Rotation(X=180) * upper_case, f"{output_directory}/case-{code_name}.stl")
+    export_step(assembly, f"{output_directory}/assembly-{code_name}.step")
+    export_stl(Compound(packed), f"{output_directory}/pack-{code_name}.stl")
     return locals()
 
 
 def main():
     return guitar_pick_case(
+        auto_code_name=True,
         slots_per_row=15,
-        slots_rows=2,
-        pick_width=34.0,  # mm
-        pick_depth=34.0,  # mm
-        pick_thickness=2.0,  # mm
-        slot_padding=0.0,  # mm
+        slots_rows=1,
+        pick_width=34,  # mm
+        pick_depth=34,  # mm
+        pick_thickness=2,  # mm
+        slot_padding=0,  # mm
         slot_tilt=30,
         slot_open=1,  # mm
         slot_open_fillet=0.5,  # mm
@@ -468,7 +509,7 @@ def main():
         enable_magnet=True,
         magnet_y_count=3,
         enable_buckle=False,
-        enable_watermark=True,
+        enable_watermark=False,
     )
 
 
