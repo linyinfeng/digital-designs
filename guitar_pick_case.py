@@ -79,8 +79,8 @@ def guitar_pick_case(
     # magnet
     enable_magnet=True,
     magnet_radius=3.0 / 2.0,  # mm
-    magnet_height=3.0,  # mm
-    magnet_radius_padding=0.1,  # mm
+    magnet_height=3.5,  # mm
+    magnet_radius_padding=0.2,  # mm
     magnet_height_padding=0.2,  # mm
     magnet_slot_inner_fillet_radius=0.1,  # mm
     magnet_slot_outer_fillet_radius=0.2,  # mm
@@ -466,8 +466,8 @@ def main():
         auto_code_name=True,
         slots_per_row=15,
         slots_rows=1,
-        pick_width=34,  # mm
-        pick_depth=34,  # mm
+        pick_width=32,  # mm
+        pick_depth=32,  # mm
         pick_thickness=2,  # mm
         slot_padding=0,  # mm
         slot_tilt=30,
