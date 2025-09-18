@@ -98,7 +98,7 @@ def guitar_pick_case(
     enable_watermark=False,
 ):
     if auto_code_name:
-        code_name=f"{slots_rows}x{slots_per_row}-w{pick_width}d{pick_width}t{pick_thickness}-t{slot_tilt}"
+        code_name = f"{slots_rows}x{slots_per_row}-w{pick_width}d{pick_width}t{pick_thickness}-t{slot_tilt}"
 
     if not slot_padding:
         slot_padding = precision
