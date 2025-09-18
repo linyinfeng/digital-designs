@@ -1,2 +1,5 @@
-ocp_vscode
 build123d
+ocp_vscode
+ocp_tessellate
+ipykernel
+black

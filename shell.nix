@@ -4,9 +4,6 @@
 
 let
   python = pkgs.python3;
-  poetry = pkgs.poetry.withPlugins (p: with p; [
-    poetry-plugin-shell
-  ]);
   fhsEnv = pkgs.buildFHSEnv {
     name = "models-env";
     targetPkgs = (
@@ -15,7 +12,6 @@ let
         python
       ]
       ++ (with pkgs; [
-        poetry
         black
         nixfmt-rfc-style
         fstl
