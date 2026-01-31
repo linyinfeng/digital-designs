@@ -5,6 +5,7 @@ description = "Digital Designs"
 authors = []
 requires-python = ">=3.13"
 dependencies = [
+  "atopile>=0.12.5",
   "bd-warehouse>=0.1.1",
   "build123d>=0.10.0",
   "jupyter>=1.1.1",
