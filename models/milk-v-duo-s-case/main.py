@@ -137,10 +137,7 @@ class Config:
         self.os_toggle_to_edge = Decimal("13.168")  # 3d model
         # self.os_toggle_to_edge = Decimal("12.925") # dxf
         self.os_toggle_slot_length = Decimal("4")
-        self.os_toggle_height = Decimal("1.3")  # estimated
-        self.os_toggle_center_y = -(
-            Decimal("0.15") + self.os_toggle_height / 2
-        )  # estimated
+        self.os_toggle_height = Decimal("1.56")  # measured
 
         self.tf_to_edge = Decimal("12.755")  # 3d model
         # self.tf_to_edge = Decimal("12.24") # dxf
@@ -198,8 +195,12 @@ class Config:
         self.csi_slot_width = Decimal("1.0")
         self.csi_slot_extra_length = Decimal("2.0")
         self.antenna_clip_width = Decimal("10.0")
-        self.os_toggle_install_angle = 45
+
+        self.os_toggle_guard_length = Decimal("3.0")
         self.tf_guard_length = self.tf_shortest_guard_to_edge + self.wall_thickness
+
+        self.csi_slot_guard_length = Decimal("10.0")
+        self.csi_slot_guard_width = self.wall_thickness * 2
 
         # M2.5x10 screw
         self.screw_outer_diameter = Decimal("2.5")
@@ -215,13 +216,16 @@ class Config:
         )  # just chamfer to wall thickness
 
         self.cut_line_radius = Decimal("2.5")
-        self.cut_line_left_lift_to = self.micro_switch_center_y
-        self.cut_line_right_lift_to = self.usb_a_bottom_height - self.accuracy
+        self.cut_line_lift = self.micro_switch_center_y
+        self.cut_line_left_lift_to = self.cut_line_lift
+        self.cut_line_right_lift_to = self.cut_line_lift
 
         self.right_bar_triangle_width = Decimal("5.0")
         self.right_bar_limit_length = Decimal("2.0")
 
         self.pcb_cutout_ratio = Decimal("2")
+
+        self.tap_guide_depth = Decimal("5.0")
 
     def complete(self):
         pass
@@ -369,6 +373,16 @@ with BuildPart() as case_builder:
         extrude(amount=inner_space_z)
         extrude(mounting_pillar_hole_sketch.sketch, amount=-f(config.wall_thickness))
 
+    # Mounting Pillar hole without screw thread
+    with BuildPart(mode=Mode.SUBTRACT):
+        with BuildSketch(
+            Plane.XY.offset(bottom_inner_face.center().Z)
+        ) as mounting_pillar_hole_no_thread_sketch:
+            with mounting_pillar_locations:
+                Circle(f(config.mounting_hole_diameter_inner / 2))
+        extrude(amount=-bottom_inner_face.center().Z) # extrude to origin
+        extrude(mounting_pillar_hole_no_thread_sketch.sketch, amount=-f(config.wall_thickness))
+
     # Screw head clearance
     with BuildPart(Plane.XY.offset(bottom_outer_face.center().Z), mode=Mode.SUBTRACT):
         with mounting_pillar_locations:
@@ -484,6 +498,14 @@ with BuildPart() as case_builder:
                 )
         extrude(amount=f(config.wall_thickness))
 
+    # CSI antenna guard
+    with BuildPart():
+        j1_guard_face = case_builder.faces(Select.LAST).filter_by(Plane.YZ)[2]
+        extruded = extrude(j1_guard_face, amount=-f(config.csi_slot_guard_width), mode=Mode.PRIVATE)
+        guard_bottom = extruded.faces().filter_by(Plane.XY).sort_by(Axis.Z)[0]
+        extrude(guard_bottom, amount=f(config.csi_slot_guard_length))
+
+
     left_cutout_plane = Plane(left_inner_face).move(
         Location((0, 0, -left_inner_face.center().Z))
     )
@@ -519,68 +541,50 @@ with BuildPart() as case_builder:
     with BuildPart(
         left_cutout_plane.offset(-f(config.wall_thickness)), mode=Mode.SUBTRACT
     ):
-        with Locations(
-            (
-                f(config.board_edge_distance / 2 - config.os_toggle_to_edge),
-                f(-config.pcb_thickness + config.os_toggle_center_y),
-                0,
-            )
-        ):
-            os_toggle_length = f(config.os_toggle_slot_length + 2 * config.accuracy)
-            os_toggle_height = f(config.os_toggle_height + 2 * config.accuracy)
-            XYWedge(
-                xsize=os_toggle_length,
-                ysize=os_toggle_height,
-                zsize=f(config.wall_thickness),
-                x_far_min=-os_toggle_length / 2,
-                y_far_min=-os_toggle_height / 2,
-                x_far_size=os_toggle_length,
-                y_far_size=os_toggle_height
-                + f(config.wall_thickness)
-                * math.tan(math.radians(config.os_toggle_install_angle)),
-            )
+        os_toggle_cutout_top_location = (
+            f(config.board_edge_distance / 2 - config.os_toggle_to_edge),
+            f(-config.pcb_thickness + config.accuracy),
+            0,
+        )
+        os_toggle_length = f(config.os_toggle_slot_length + 2 * config.accuracy)
+        with Locations(os_toggle_cutout_top_location):
+            cut_box = Box(os_toggle_length, os_toggle_cutout_top_location[1] - bottom_outer_face.center().Z, f(config.wall_thickness), align=(Align.CENTER, Align.MAX, Align.MIN))
+            guard_face = cut_box.faces().filter_by(Plane.YZ).sort_by(Axis.X, reverse=True)[0]
+    with BuildPart():
+        extrude(guard_face, amount=f(config.os_toggle_guard_length))
+    with BuildPart(left_cutout_plane.offset(-f(config.wall_thickness)), mode=Mode.SUBTRACT):
+        with Locations(os_toggle_cutout_top_location):
+            Box(os_toggle_length, f(config.os_toggle_height + 2 * config.accuracy), f(config.os_toggle_guard_length * 2), align=(Align.CENTER, Align.MAX, Align.MIN))
 
     # TF card slot cutout
     tf_slot_location = (
         f(-config.board_edge_distance / 2 + config.tf_to_edge),
-        f(-config.pcb_thickness - config.tf_height / 2),
+        f(-config.pcb_thickness + config.accuracy), # align Y to max
     )
     tf_slot_length = f(config.tf_slot_width + 2 * config.accuracy)
     tf_slot_height = f(config.tf_height + 2 * config.accuracy)
-    with BuildPart(left_cutout_plane, mode=Mode.SUBTRACT):
-        with Locations(Pos(tf_slot_location) * Rotation(Y=180)):
-            y_far_min = bottom_inner_face.center().Z - tf_slot_location[1]
-            y_far_max = tf_slot_height / 2 + f(config.tf_finger_space_up)
-            y_far_size = y_far_max - y_far_min  # y_far_size from absolute points
-            XYWedge(
-                xsize=tf_slot_length,
-                ysize=tf_slot_height,
-                zsize=f(config.wall_thickness),
-                x_far_min=-tf_slot_length / 2,
-                y_far_min=y_far_min,
-                x_far_size=tf_slot_length,
-                y_far_size=y_far_size,
-            )
     with BuildPart():
         with BuildSketch(left_cutout_plane):
             with Locations(Pos(tf_slot_location)):
-                with Locations(Pos(Y=tf_slot_height / 2)):
-                    with GridLocations(
-                        tf_slot_length + f(config.wall_thickness), 0, 2, 1
-                    ):
-                        Rectangle(
-                            f(config.wall_thickness),
-                            tf_slot_height + f(config.wall_thickness),
-                            align=(Align.CENTER, Align.MAX),
-                        )
-                with Locations(Pos(Y=-tf_slot_height / 2)):
+                with GridLocations(
+                    tf_slot_length + f(config.wall_thickness), 0, 2, 1
+                ):
+                    Rectangle(
+                        f(config.wall_thickness),
+                        tf_slot_height + f(config.wall_thickness),
+                        align=(Align.CENTER, Align.MAX),
+                    )
+                with Locations(Pos(Y=-tf_slot_height)):
                     Rectangle(
                         tf_slot_length + f(config.wall_thickness) * 2,
-                        bottom_inner_face.center().Z
-                        - (tf_slot_location[1] - tf_slot_height / 2),
+                        tf_slot_location[1] - tf_slot_height - bottom_inner_face.center().Z,
                         align=(Align.CENTER, Align.MAX),
                     )
         extrude(amount=f(config.tf_guard_length))
+    # cut from outer wall
+    with BuildPart(left_cutout_plane.offset(-f(config.wall_thickness)), mode=Mode.SUBTRACT) as test:
+        with Locations(Pos(tf_slot_location)):
+            Box(tf_slot_length, tf_slot_location[1] - bottom_outer_face.center().Z, f(config.wall_thickness + config.tf_shortest_guard_to_edge), align=(Align.CENTER, Align.MAX, Align.MIN))
 
     # Antenna clip
     with BuildPart() as antenna_clip_builder:
@@ -673,31 +677,11 @@ show_list([board, case_builder], locals())
 
 # # %%
 
-# Split
-case_bbox = case_builder.part.bounding_box()
-with BuildPart() as lower_case_mask_builder:
-    with BuildSketch(Plane.XZ):
-        with BuildLine():
-            begin = (case_bbox.min.X, f(config.cut_line_left_lift_to))
-            left_radius = f(config.cut_line_left_lift_to) / 2
-            l1 = Line(begin, (begin[0] + f(config.box_outer_radius) * 2, begin[1]))
-            l2 = CenterArc(l1 @ 1 + (0, -left_radius), left_radius, 90, -90)
-            l3 = CenterArc(l2 @ 1 + (left_radius, 0), left_radius, 180, 90)
-            end = (case_bbox.max.X, f(config.cut_line_right_lift_to))
-            right_radius = f(config.cut_line_right_lift_to) / 2
-            l4 = Line((end[0] - f(config.box_outer_radius) * 2, end[1]), end)
-            l5 = CenterArc(l4 @ 0 + (0, -right_radius), right_radius, 180, -90)
-            l6 = CenterArc(l5 @ 0 + (-right_radius, 0), right_radius, -90, 90)
-            l7 = Line(l3 @ 1, l6 @ 0)
-            l8 = Line(end, (case_bbox.max.X, case_bbox.min.Z))
-            l9 = Line(l8 @ 1, l8 @ 1 + (-case_bbox.size.X, 0))
-            l10 = Line(l9 @ 1, l1 @ 0)
-        make_face()
-    extrude(amount=case_bbox.size.Y / 2, both=True)
-
 with BuildPart() as lower_case_builder:
     lower_case_builder.label = "Milk-V Duo S Lower Case"
     add(case_builder.part)
+    split(case_builder.part, Plane.XY.offset(f(config.cut_line_lift)), keep=Keep.BOTTOM)
+
     # PCB install space
     with BuildPart(mode=Mode.SUBTRACT):
         extrude(
@@ -706,8 +690,7 @@ with BuildPart() as lower_case_builder:
                 f(config.cut_line_left_lift_to), f(config.cut_line_right_lift_to)
             ),
         )
-    with BuildPart(mode=Mode.INTERSECT):
-        add(lower_case_mask_builder.part)
+
     # Bar limit
     bar_limit_x = f(
                         config.board_edge_distance / 2
@@ -735,21 +718,11 @@ with BuildPart() as lower_case_builder:
                 )
         extrude(amount=f(config.accuracy), mode=Mode.SUBTRACT)
 
-    # Mounting Pillar hole without screw thread
-    with BuildPart(mode=Mode.SUBTRACT):
-        with BuildSketch(
-            Plane.XY.offset(bottom_inner_face.center().Z)
-        ) as mounting_pillar_hole_no_thread_sketch:
-            with mounting_pillar_locations:
-                Circle(f(config.mounting_hole_diameter_inner / 2))
-        extrude(amount=-bottom_inner_face.center().Z) # extrude to origin
-        extrude(mounting_pillar_hole_no_thread_sketch.sketch, amount=-f(config.wall_thickness))
-
 with BuildPart() as upper_case_builder:
     upper_case_builder.label = "Milk-V Duo S Upper Case"
     add(case_builder.part)
-    with BuildPart(mode=Mode.SUBTRACT):
-        add(lower_case_mask_builder.part)
+    split(case_builder.part, Plane.XY.offset(f(config.cut_line_lift)), keep=Keep.TOP)
+
     # Extra mounting pillar extend
     # Trim existing pillars
     with BuildPart(mode=Mode.SUBTRACT):
@@ -761,9 +734,9 @@ with BuildPart() as upper_case_builder:
                 f(config.cut_line_left_lift_to), f(config.cut_line_right_lift_to)
             )
         )
-    # Add extend
+    # Add pillar extend
     with BuildPart():
-        with BuildSketch(Plane.XY) as mounting_pillar_extend_sketch_builder:
+        with BuildSketch(Plane.XY.offset(f(config.accuracy))):
             with mounting_pillar_locations:
                 Circle(f(config.mounting_hole_diameter_outer / 2 - config.accuracy))
                 Circle(f(config.screw_drill_diameter / 2), mode=Mode.SUBTRACT)
@@ -772,11 +745,12 @@ with BuildPart() as upper_case_builder:
                 f(config.cut_line_left_lift_to), f(config.cut_line_right_lift_to)
             )
         )
-        extrude(
-            mounting_pillar_extend_sketch_builder.sketch,
-            amount=f(config.accuracy),
-            mode=Mode.SUBTRACT,
-        )
+    with BuildPart(mode=Mode.SUBTRACT):
+        with BuildSketch(Plane.XY.offset(f(config.accuracy))):
+            with mounting_pillar_locations:
+                Circle(f(config.screw_outer_diameter / 2))
+        extrude(amount=f(config.tap_guide_depth))
+
     # Bar triangle
     with BuildPart():
         with BuildSketch(right_cutout_plane):
