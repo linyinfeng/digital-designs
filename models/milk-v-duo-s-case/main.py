@@ -37,6 +37,53 @@ original_board.label = "Milk-V Duo S"
 # %%
 
 
+def show_list(lst, locals, camera=Camera.KEEP):
+    lst = lst[:]
+    if "test" in locals:
+        lst.append(locals["test"])
+    show(*lst, reset_camera=camera)
+
+
+# %%
+
+
+class XYWedge(BasePartObject):
+    def __init__(
+        self,
+        xsize: float,
+        ysize: float,
+        zsize: float,
+        x_far_min: float,
+        y_far_min: float,
+        x_far_size: float,
+        y_far_size: float,
+        rotation: RotationLike = (0, 0, 0),
+        align: Align | tuple[Align, Align, Align] | None = None,
+        mode: Mode = Mode.ADD,
+    ):
+        with BuildPart() as xy_wedge_builder:
+            with Locations(Rotation(X=90) * Pos(X=-xsize / 2, Z=-ysize / 2)):
+                Wedge(
+                    xsize=xsize,
+                    ysize=zsize,
+                    zsize=ysize,
+                    xmin=x_far_min + xsize / 2,
+                    zmin=y_far_min + ysize / 2,
+                    xmax=x_far_min + xsize / 2 + x_far_size,
+                    zmax=y_far_min + ysize / 2 + y_far_size,
+                    align=(None, Align.MIN, None),
+                )
+            mirror(about=Plane.XZ, mode=Mode.REPLACE)
+        super().__init__(
+            part=xy_wedge_builder.part, rotation=rotation, align=align, mode=mode
+        )
+
+
+show_list([XYWedge(1, 1, 1, 3, 5, 1, 2)], locals(), camera=Camera.TOP)
+
+# %%
+
+
 class Config:
     def __init__(self):
         self.fill_truth()
@@ -77,19 +124,19 @@ class Config:
         self.csi_j2_slot_to_edge_x = Decimal("15.11")
         self.csi_j2_slot_to_edge_y = Decimal("8.40")  # estimated
 
-        self.type_c_to_edge = Decimal("17.5")
+        self.type_c_to_edge = Decimal("17.5") + Decimal("0.2")
         self.type_c_height = Decimal("3.16")  # estimated
         self.type_c_width = Decimal("8.94")  # estimated
         self.type_c_radius = Decimal("1.28")  # estimated
 
-        self.micro_switch_1_to_edge = Decimal("8.03")
-        self.micro_switch_2_to_edge = Decimal("14.32")
+        self.micro_switch_1_to_edge = Decimal("8.03") + Decimal("0.2")
+        self.micro_switch_2_to_edge = Decimal("14.32") + Decimal("0.2")
         self.micro_switch_radius = Decimal("1.0")
-        self.micro_switch_center_y = Decimal("1.6")  # estimated
+        self.micro_switch_center_y = Decimal("1.6") + Decimal("0.2")  # estimated
 
         self.os_toggle_to_edge = Decimal("13.168")  # 3d model
         # self.os_toggle_to_edge = Decimal("12.925") # dxf
-        self.os_toggle_slot_length = Decimal("5")
+        self.os_toggle_slot_length = Decimal("4")
         self.os_toggle_height = Decimal("1.3")  # estimated
         self.os_toggle_center_y = -(
             Decimal("0.15") + self.os_toggle_height / 2
@@ -99,17 +146,20 @@ class Config:
         # self.tf_to_edge = Decimal("12.24") # dxf
         self.tf_height = Decimal("1.32")
         self.tf_slot_width = Decimal("12")
-        self.tf_finger_space = Decimal("5.0")
+        self.tf_shortest_guard_to_edge = Decimal("3.6")
+        self.tf_finger_space_up = Decimal("1.0")
 
         self.ethernet_to_edge = Decimal("17.155")  # 3d model
         # self.ethernet_to_edge = Decimal("16.645") # dxf
-        self.ethernet_height = Decimal("13.50")
+        # self.ethernet_height = Decimal("13.50") #3d model
+        self.ethernet_height = Decimal("13.20")
         self.ethernet_width = Decimal("15.93")
         self.ethernet_length = Decimal("21.250")
 
         self.usb_a_to_edge = Decimal("12.02")  # 3d model
         # self.usb_a_to_edge = Decimal("11.78")
-        self.usb_a_height = Decimal("13.1")
+        # self.usb_a_height = Decimal("13.1") # 3d model
+        self.usb_a_height = Decimal("12.8")
         self.usb_a_bottom_height = Decimal("0.7")
         self.usb_a_width = Decimal("5.7")
         self.usb_a_ear_size = Decimal("0.65")
@@ -124,15 +174,15 @@ class Config:
     def custom(self):
         self.accuracy = Decimal("0.2")
         self.wall_thickness = self.edge_to_type_c_face_distance - self.accuracy
-        self.extra_bottom_space = Decimal("1.0")
+        self.extra_bottom_space = Decimal("0.5")
         assert self.extra_bottom_space >= self.accuracy
         self.extra_top_space = Decimal("1.5")
         self.box_inner_radius = self.mounting_hole_diameter_outer / 2 + self.accuracy
         self.box_outer_radius = (
             self.mounting_hole_diameter_outer / 2 + self.accuracy + self.wall_thickness
         )
-        self.heat_dissipation_slot_width = Decimal("2.0")
-        self.heat_dissipation_slot_length = Decimal("20.0")
+        self.heat_dissipation_slot_width = Decimal("2.5")
+        self.heat_dissipation_slot_length = Decimal("16.0")
         self.heat_dissipation_slot_spacing_x = self.heat_dissipation_slot_width
         self.heat_dissipation_slot_spacing_y = self.heat_dissipation_slot_spacing_x
         self.bottom_heat_dissipation_slot_locations = GridLocations(
@@ -143,12 +193,13 @@ class Config:
                 self.heat_dissipation_slot_width + self.heat_dissipation_slot_spacing_y
             ),
             x_count=2,
-            y_count=8,
+            y_count=7,
         )
         self.csi_slot_width = Decimal("1.0")
         self.csi_slot_extra_length = Decimal("2.0")
-        self.antenna_clip_width = Decimal("3.0")
+        self.antenna_clip_width = Decimal("10.0")
         self.os_toggle_install_angle = 45
+        self.tf_guard_length = self.tf_shortest_guard_to_edge + self.wall_thickness
 
         # M2.5x10 screw
         self.screw_outer_diameter = Decimal("2.5")
@@ -166,6 +217,11 @@ class Config:
         self.cut_line_radius = Decimal("2.5")
         self.cut_line_left_lift_to = self.micro_switch_center_y
         self.cut_line_right_lift_to = self.usb_a_bottom_height - self.accuracy
+
+        self.right_bar_triangle_width = Decimal("5.0")
+        self.right_bar_limit_length = Decimal("2.0")
+
+        self.pcb_cutout_ratio = Decimal("2")
 
     def complete(self):
         pass
@@ -206,13 +262,7 @@ show(board, bbox)
 
 # %%
 
-show_list = []
-
-# %%
-
 with BuildPart() as case_builder:
-    show_list = [board, case_builder]
-
     case_builder.label = "Milk-V Duo S Case"
     with BuildSketch(
         Plane.XY.move(Location(bbox.min)).offset(-f(config.extra_bottom_space))
@@ -264,77 +314,6 @@ with BuildPart() as case_builder:
                 Circle(f(config.mounting_hole_diameter_outer / 2 + config.accuracy))
         extrude(amount=inner_space_z)
 
-    # Mounting Pillar hole
-    with BuildPart(mode=Mode.SUBTRACT):
-        with BuildSketch(
-            Plane.XY.offset(bottom_inner_face.center().Z)
-        ) as mounting_pillar_hole_sketch:
-            with mounting_pillar_locations:
-                Circle(f(config.screw_drill_diameter / 2))  # no accuracy here (tapping)
-        extrude(amount=inner_space_z)
-        extrude(mounting_pillar_hole_sketch.sketch, amount=-f(config.wall_thickness))
-
-    # Screw head clearance
-    with BuildPart(Plane.XY.offset(bottom_outer_face.center().Z), mode=Mode.SUBTRACT):
-        with mounting_pillar_locations:
-            Cone(
-                bottom_radius=f(config.screw_head_diameter / 2 + config.accuracy),
-                top_radius=f(
-                    config.screw_drill_diameter / 2
-                ),  # no accuracy here (tapping)
-                height=f(config.screw_head_thickness + config.accuracy),
-                align=(Align.CENTER, Align.CENTER, Align.MIN),
-            )
-
-    # PCB cutout
-    with BuildPart(mode=Mode.SUBTRACT):
-        with BuildSketch(Plane.XY) as pcb_xy_sketch:
-            RectangleRounded(
-                f(config.board_edge_distance + config.accuracy),
-                f(config.board_edge_distance + config.accuracy),
-                radius=f(config.mounting_hole_diameter_outer / 2 + config.accuracy),
-            )
-        extrude(amount=-f(config.pcb_thickness + config.accuracy))
-        extrude(pcb_xy_sketch.sketch, amount=f(config.accuracy))
-
-    # Bottom heat dissipation slots
-    with BuildPart(mode=Mode.SUBTRACT):
-        with BuildSketch(bottom_inner_face):
-            with config.bottom_heat_dissipation_slot_locations:
-                SlotOverall(
-                    f(config.heat_dissipation_slot_length),
-                    f(config.heat_dissipation_slot_width),
-                )
-        extrude(amount=-f(config.wall_thickness))
-
-    # Top heat dissipation slots
-    with BuildPart(mode=Mode.SUBTRACT):
-        with BuildSketch(top_inner_face):
-            with Locations(
-                (
-                    -f(
-                        config.heat_dissipation_slot_length
-                        + config.heat_dissipation_slot_spacing_x
-                    )
-                    / 2,
-                    0,
-                )
-            ):
-                with GridLocations(
-                    x_spacing=0,
-                    y_spacing=f(
-                        config.heat_dissipation_slot_width
-                        + config.heat_dissipation_slot_spacing_y
-                    ),
-                    x_count=1,
-                    y_count=5,
-                ):
-                    SlotOverall(
-                        f(config.heat_dissipation_slot_length),
-                        f(config.heat_dissipation_slot_width),
-                    )
-        extrude(amount=f(config.wall_thickness))
-
     # GPIO guards
     top_cutout_plane = Plane.XY.offset(top_inner_face.center().Z)
     gpio_locations = GridLocations(
@@ -380,6 +359,66 @@ with BuildPart() as case_builder:
                 )
         extrude(amount=-f(config.gpio_guard_depth))
 
+    # Mounting Pillar hole
+    with BuildPart(mode=Mode.SUBTRACT):
+        with BuildSketch(
+            Plane.XY.offset(bottom_inner_face.center().Z)
+        ) as mounting_pillar_hole_sketch:
+            with mounting_pillar_locations:
+                Circle(f(config.screw_drill_diameter / 2))  # no accuracy here (tapping)
+        extrude(amount=inner_space_z)
+        extrude(mounting_pillar_hole_sketch.sketch, amount=-f(config.wall_thickness))
+
+    # Screw head clearance
+    with BuildPart(Plane.XY.offset(bottom_outer_face.center().Z), mode=Mode.SUBTRACT):
+        with mounting_pillar_locations:
+            Cone(
+                bottom_radius=f(config.screw_head_diameter / 2 + config.accuracy),
+                top_radius=f(
+                    config.screw_drill_diameter / 2
+                ),  # no accuracy here (tapping)
+                height=f(config.screw_head_thickness + config.accuracy),
+                align=(Align.CENTER, Align.CENTER, Align.MIN),
+            )
+
+    # Bottom heat dissipation slots
+    with BuildPart(mode=Mode.SUBTRACT):
+        with BuildSketch(bottom_inner_face):
+            with config.bottom_heat_dissipation_slot_locations:
+                SlotOverall(
+                    f(config.heat_dissipation_slot_length),
+                    f(config.heat_dissipation_slot_width),
+                )
+        extrude(amount=-f(config.wall_thickness))
+
+    # Top heat dissipation slots
+    with BuildPart(mode=Mode.SUBTRACT):
+        with BuildSketch(top_inner_face):
+            with Locations(
+                (
+                    -f(
+                        config.heat_dissipation_slot_length
+                        + config.heat_dissipation_slot_spacing_x
+                    )
+                    / 2,
+                    0,
+                )
+            ):
+                with GridLocations(
+                    x_spacing=0,
+                    y_spacing=f(
+                        config.heat_dissipation_slot_width
+                        + config.heat_dissipation_slot_spacing_y
+                    ),
+                    x_count=1,
+                    y_count=5,
+                ):
+                    SlotOverall(
+                        f(config.heat_dissipation_slot_length),
+                        f(config.heat_dissipation_slot_width),
+                    )
+        extrude(amount=f(config.wall_thickness))
+
     # GPIO cutout
     with BuildPart(mode=Mode.SUBTRACT):
         with BuildSketch(top_cutout_plane) as gpio_cutout_sketch:
@@ -409,24 +448,6 @@ with BuildPart() as case_builder:
                 face_bbox.size.X, face_bbox.size.Y, radius=f(config.box_outer_radius)
             )
         extrude(amount=inner_space_z + f(config.wall_thickness), both=True)
-
-    # Antenna clip
-    poe_bbox = poe_cutout_sketch.sketch.bounding_box()
-    with BuildSketch(Plane.XY.offset(f(config.ethernet_height + config.accuracy))):
-        with BuildLine():
-            l1 = Line(
-                (poe_bbox.min.X, poe_bbox.max.Y + f(config.wall_thickness)),
-                (bbox.max.X, poe_bbox.max.Y + f(config.wall_thickness)),
-            )
-            l2 = Line(l1 @ 1, l1 @ 1 + (0.0, f(config.antenna_clip_width)))
-            l3 = Line(l2 @ 1, l1 @ 0)
-        make_face()
-    extrude(amount=f(config.wall_thickness))
-    front_wall_face = case_builder.faces(Select.LAST).filter_by(Plane.XZ)[0]
-    front_wall = extrude(front_wall_face, amount=f(config.wall_thickness))
-    extrude(
-        front_wall.faces().filter_by(Plane.XY).sort_by(Axis.Z)[-1], until=top_inner_face
-    )
 
     # CSI cutout
     with BuildPart(mode=Mode.SUBTRACT):
@@ -495,47 +516,93 @@ with BuildPart() as case_builder:
         extrude(amount=-f(config.wall_thickness))
 
     # OS toggle cutout
-    with BuildPart(left_cutout_plane, mode=Mode.SUBTRACT):
+    with BuildPart(
+        left_cutout_plane.offset(-f(config.wall_thickness)), mode=Mode.SUBTRACT
+    ):
         with Locations(
             (
                 f(config.board_edge_distance / 2 - config.os_toggle_to_edge),
                 f(-config.pcb_thickness + config.os_toggle_center_y),
+                0,
             )
         ):
-            length = f(config.os_toggle_slot_length + 2 * config.accuracy)
-            height = f(config.os_toggle_height + 2 * config.accuracy)
-            with Locations(
-                Pos(length / 2, -height / 2, -f(config.wall_thickness))
-                * Rotation(X=-90, Z=180)
-            ):
-                Wedge(
-                    xsize=length,
-                    ysize=f(config.wall_thickness),
-                    zsize=height,
-                    xmin=0.0,
-                    zmin=0.0,
-                    xmax=length,
-                    zmax=height
-                    + f(config.wall_thickness)
-                    * math.tan(math.radians(config.os_toggle_install_angle)),
-                    align=(Align.MIN, Align.MIN, Align.MIN),
-                )
+            os_toggle_length = f(config.os_toggle_slot_length + 2 * config.accuracy)
+            os_toggle_height = f(config.os_toggle_height + 2 * config.accuracy)
+            XYWedge(
+                xsize=os_toggle_length,
+                ysize=os_toggle_height,
+                zsize=f(config.wall_thickness),
+                x_far_min=-os_toggle_length / 2,
+                y_far_min=-os_toggle_height / 2,
+                x_far_size=os_toggle_length,
+                y_far_size=os_toggle_height
+                + f(config.wall_thickness)
+                * math.tan(math.radians(config.os_toggle_install_angle)),
+            )
 
-    # SD card slot cutout
-    with BuildPart(mode=Mode.SUBTRACT):
+    # TF card slot cutout
+    tf_slot_location = (
+        f(-config.board_edge_distance / 2 + config.tf_to_edge),
+        f(-config.pcb_thickness - config.tf_height / 2),
+    )
+    tf_slot_length = f(config.tf_slot_width + 2 * config.accuracy)
+    tf_slot_height = f(config.tf_height + 2 * config.accuracy)
+    with BuildPart(left_cutout_plane, mode=Mode.SUBTRACT):
+        with Locations(Pos(tf_slot_location) * Rotation(Y=180)):
+            y_far_min = bottom_inner_face.center().Z - tf_slot_location[1]
+            y_far_max = tf_slot_height / 2 + f(config.tf_finger_space_up)
+            y_far_size = y_far_max - y_far_min  # y_far_size from absolute points
+            XYWedge(
+                xsize=tf_slot_length,
+                ysize=tf_slot_height,
+                zsize=f(config.wall_thickness),
+                x_far_min=-tf_slot_length / 2,
+                y_far_min=y_far_min,
+                x_far_size=tf_slot_length,
+                y_far_size=y_far_size,
+            )
+    with BuildPart():
         with BuildSketch(left_cutout_plane):
-            with Locations(
-                (
-                    f(-config.board_edge_distance / 2 + config.tf_to_edge),
-                    f(-config.pcb_thickness - config.tf_height / 2),
+            with Locations(Pos(tf_slot_location)):
+                with Locations(Pos(Y=tf_slot_height / 2)):
+                    with GridLocations(
+                        tf_slot_length + f(config.wall_thickness), 0, 2, 1
+                    ):
+                        Rectangle(
+                            f(config.wall_thickness),
+                            tf_slot_height + f(config.wall_thickness),
+                            align=(Align.CENTER, Align.MAX),
+                        )
+                with Locations(Pos(Y=-tf_slot_height / 2)):
+                    Rectangle(
+                        tf_slot_length + f(config.wall_thickness) * 2,
+                        bottom_inner_face.center().Z
+                        - (tf_slot_location[1] - tf_slot_height / 2),
+                        align=(Align.CENTER, Align.MAX),
+                    )
+        extrude(amount=f(config.tf_guard_length))
+
+    # Antenna clip
+    with BuildPart() as antenna_clip_builder:
+        poe_bbox = poe_cutout_sketch.sketch.bounding_box()
+        with BuildSketch(Plane.XY.offset(f(config.ethernet_height + config.accuracy))):
+            with BuildLine():
+                l1 = Line(
+                    (poe_bbox.min.X - f(config.wall_thickness), poe_bbox.max.Y + f(config.wall_thickness)),
+                    (bbox.max.X - f(config.wall_thickness), poe_bbox.max.Y + f(config.wall_thickness)),
                 )
-            ):
-                Rectangle(
-                    f(config.tf_slot_width + 2 * config.accuracy),
-                    f(config.tf_height + 2 * config.accuracy),
-                )
-        extrude(amount=-f(config.wall_thickness))
-        # TODO fingertip space
+                l2 = Line(l1 @ 1, l1 @ 1 + (0.0, f(config.antenna_clip_width)))
+                l3 = Line(l2 @ 1, l1 @ 0)
+            make_face()
+        extruded = extrude(amount=f(config.wall_thickness))
+        with BuildSketch(Plane(extruded.faces().filter_by(Plane.YZ)[0])):
+            with BuildLine():
+                l1 = Line((-f(config.antenna_clip_width) / 2, f(config.wall_thickness) / 2),
+                          (f(config.antenna_clip_width) / 2, -f(config.wall_thickness) / 2))
+                l2 = Line(l1 @ 1, l1 @ 1 - (f(config.antenna_clip_width), 0))
+                l3 = Line(l2 @ 1, l1 @ 0)
+            make_face()
+        extrude(amount=-(bbox.max.X - poe_bbox.min.X), mode=Mode.INTERSECT)
 
     right_cutout_plane = (
         Plane(right_inner_face)
@@ -591,14 +658,25 @@ with BuildPart() as case_builder:
                 )
         extrude(amount=f(config.usb_a_ear_thickness + config.accuracy))
 
-show(*show_list, reset_camera=Camera.CENTER)
+    # PCB cutout
+    with BuildPart(mode=Mode.SUBTRACT):
+        with BuildSketch(Plane.XY) as pcb_xy_sketch:
+            RectangleRounded(
+                f(config.board_edge_distance + config.accuracy * 2 * config.pcb_cutout_ratio),
+                f(config.board_edge_distance + config.accuracy * 2 * config.pcb_cutout_ratio),
+                radius=f(config.mounting_hole_diameter_outer / 2 - config.accuracy * config.pcb_cutout_ratio),
+            )
+        extrude(amount=-f(config.pcb_thickness + config.accuracy))
+        extrude(pcb_xy_sketch.sketch, amount=f(config.accuracy))
 
-# %%
+show_list([board, case_builder], locals())
+
+# # %%
 
 # Split
 case_bbox = case_builder.part.bounding_box()
 with BuildPart() as lower_case_mask_builder:
-    with BuildSketch(Plane.XZ) as test:
+    with BuildSketch(Plane.XZ):
         with BuildLine():
             begin = (case_bbox.min.X, f(config.cut_line_left_lift_to))
             left_radius = f(config.cut_line_left_lift_to) / 2
@@ -617,15 +695,104 @@ with BuildPart() as lower_case_mask_builder:
         make_face()
     extrude(amount=case_bbox.size.Y / 2, both=True)
 
-lower_case = case_builder.part.intersect(lower_case_mask_builder.part)
-lower_case.label = "Milk-V Duo S Lower Case"
+with BuildPart() as lower_case_builder:
+    lower_case_builder.label = "Milk-V Duo S Lower Case"
+    add(case_builder.part)
+    # PCB install space
+    with BuildPart(mode=Mode.SUBTRACT):
+        extrude(
+            pcb_xy_sketch.sketch,
+            amount=max(
+                f(config.cut_line_left_lift_to), f(config.cut_line_right_lift_to)
+            ),
+        )
+    with BuildPart(mode=Mode.INTERSECT):
+        add(lower_case_mask_builder.part)
+    # Bar limit
+    bar_limit_x = f(
+                        config.board_edge_distance / 2
+                        - config.ethernet_to_edge
+                        - config.ethernet_width / 2
+                        - config.accuracy
+                    )
+    with BuildPart():
+        with BuildSketch(right_cutout_plane):
+            with Locations((bar_limit_x, bottom_inner_face.center().Z)):
+                Rectangle(
+                    f(config.wall_thickness),
+                    f(config.cut_line_right_lift_to)
+                    + f(config.right_bar_limit_length)
+                    - bottom_inner_face.center().Z,
+                    align=(Align.MAX, Align.MIN),
+                )
+        extrude(amount=f(config.wall_thickness))
+        with BuildSketch(right_cutout_plane):
+            with Locations((bar_limit_x, f(config.cut_line_right_lift_to))):
+                Rectangle(
+                    f(config.wall_thickness),
+                    f(config.right_bar_limit_length),
+                    align=(Align.MAX, Align.MIN),
+                )
+        extrude(amount=f(config.accuracy), mode=Mode.SUBTRACT)
 
-upper_case = case_builder.part - lower_case_mask_builder.part
-upper_case.label = "Milk-V Duo S Upper Case"
+    # Mounting Pillar hole without screw thread
+    with BuildPart(mode=Mode.SUBTRACT):
+        with BuildSketch(
+            Plane.XY.offset(bottom_inner_face.center().Z)
+        ) as mounting_pillar_hole_no_thread_sketch:
+            with mounting_pillar_locations:
+                Circle(f(config.mounting_hole_diameter_inner / 2))
+        extrude(amount=-bottom_inner_face.center().Z) # extrude to origin
+        extrude(mounting_pillar_hole_no_thread_sketch.sketch, amount=-f(config.wall_thickness))
 
-show_list = [board, lower_case, upper_case]
+with BuildPart() as upper_case_builder:
+    upper_case_builder.label = "Milk-V Duo S Upper Case"
+    add(case_builder.part)
+    with BuildPart(mode=Mode.SUBTRACT):
+        add(lower_case_mask_builder.part)
+    # Extra mounting pillar extend
+    # Trim existing pillars
+    with BuildPart(mode=Mode.SUBTRACT):
+        with BuildSketch(Plane.XY):
+            with mounting_pillar_locations:
+                Circle(f(config.mounting_hole_diameter_outer / 2 + config.accuracy))
+        extrude(
+            amount=max(
+                f(config.cut_line_left_lift_to), f(config.cut_line_right_lift_to)
+            )
+        )
+    # Add extend
+    with BuildPart():
+        with BuildSketch(Plane.XY) as mounting_pillar_extend_sketch_builder:
+            with mounting_pillar_locations:
+                Circle(f(config.mounting_hole_diameter_outer / 2 - config.accuracy))
+                Circle(f(config.screw_drill_diameter / 2), mode=Mode.SUBTRACT)
+        extrude(
+            amount=max(
+                f(config.cut_line_left_lift_to), f(config.cut_line_right_lift_to)
+            )
+        )
+        extrude(
+            mounting_pillar_extend_sketch_builder.sketch,
+            amount=f(config.accuracy),
+            mode=Mode.SUBTRACT,
+        )
+    # Bar triangle
+    with BuildPart():
+        with BuildSketch(right_cutout_plane):
+            with Locations((bar_limit_x,
+                top_inner_face.center().Z,
+            )):
+                Rectangle(
+                    f(config.wall_thickness),
+                    top_inner_face.center().Z
+                    - f(config.cut_line_right_lift_to)
+                    - f(config.right_bar_limit_length),
+                    align=(Align.MAX, Align.MAX),
+                )
+        extrude(amount=f(config.wall_thickness))
 
-show(*show_list, reset_camera=Camera.CENTER)
+show_list([board, lower_case_builder, upper_case_builder], locals())
 
 # %%
 
@@ -633,3 +800,15 @@ total_volume = case_builder.part.volume * ureg.mm**3
 pla_density = 1.24 * ureg.g / ureg.cm**3
 print(f"Total volume: {total_volume}")
 print(f"Estimated weight (PLA): {(total_volume * pla_density).to(ureg.g):.1f}")
+
+# %%
+
+from pathlib import Path
+
+assert upper_case_builder.part.intersect(lower_case_builder.part).volume == 0
+
+script_directory = Path(__file__).resolve().parent
+export_stl(upper_case_builder.part, f"{script_directory}/../../outputs/milk-v-duo-s-case-upper.stl")
+export_stl(lower_case_builder.part, f"{script_directory}/../../outputs/milk-v-duo-s-case-lower.stl")
+
+# %%
