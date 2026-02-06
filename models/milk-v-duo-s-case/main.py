@@ -199,12 +199,12 @@ class Config:
         self.os_toggle_guard_length = Decimal("3.0")
         self.tf_guard_length = self.tf_shortest_guard_to_edge + self.wall_thickness
 
-        self.csi_slot_guard_length = Decimal("10.0")
+        self.csi_slot_guard_length = Decimal("15.0")
         self.csi_slot_guard_width = self.wall_thickness * 2
 
         # M2.5x10 screw
         self.screw_outer_diameter = Decimal("2.5")
-        self.screw_drill_diameter = Decimal("2.1")
+        self.screw_drill_diameter = Decimal("2.05") + Decimal("0.35") # measured value
         self.screw_head_thickness = Decimal("1.5")
         self.screw_head_diameter = Decimal("4.1")
 
@@ -379,7 +379,7 @@ with BuildPart() as case_builder:
             Plane.XY.offset(bottom_inner_face.center().Z)
         ) as mounting_pillar_hole_no_thread_sketch:
             with mounting_pillar_locations:
-                Circle(f(config.mounting_hole_diameter_inner / 2))
+                Circle(f(config.screw_outer_diameter / 2 + config.accuracy))
         extrude(amount=-bottom_inner_face.center().Z) # extrude to origin
         extrude(mounting_pillar_hole_no_thread_sketch.sketch, amount=-f(config.wall_thickness))
 
@@ -498,12 +498,12 @@ with BuildPart() as case_builder:
                 )
         extrude(amount=f(config.wall_thickness))
 
-    # CSI antenna guard
-    with BuildPart():
-        j1_guard_face = case_builder.faces(Select.LAST).filter_by(Plane.YZ)[2]
-        extruded = extrude(j1_guard_face, amount=-f(config.csi_slot_guard_width), mode=Mode.PRIVATE)
-        guard_bottom = extruded.faces().filter_by(Plane.XY).sort_by(Axis.Z)[0]
-        extrude(guard_bottom, amount=f(config.csi_slot_guard_length))
+    # # CSI antenna guard
+    # with BuildPart():
+    #     j1_guard_face = case_builder.faces(Select.LAST).filter_by(Plane.YZ)[1]
+    #     extruded = extrude(j1_guard_face, amount=-f(config.csi_slot_guard_width), mode=Mode.PRIVATE)
+    #     guard_bottom = extruded.faces().filter_by(Plane.XY).sort_by(Axis.Z)[0]
+    #     extrude(guard_bottom, amount=f(config.csi_slot_guard_length))
 
 
     left_cutout_plane = Plane(left_inner_face).move(
@@ -745,11 +745,6 @@ with BuildPart() as upper_case_builder:
                 f(config.cut_line_left_lift_to), f(config.cut_line_right_lift_to)
             )
         )
-    with BuildPart(mode=Mode.SUBTRACT):
-        with BuildSketch(Plane.XY.offset(f(config.accuracy))):
-            with mounting_pillar_locations:
-                Circle(f(config.screw_outer_diameter / 2))
-        extrude(amount=f(config.tap_guide_depth))
 
     # Bar triangle
     with BuildPart():
