@@ -204,8 +204,7 @@ class Config:
 
         # M2.5x10 screw
         self.screw_outer_diameter = Decimal("2.5")
-        # self.screw_drill_diameter = Decimal("2.05") + Decimal("0.35") # measured value
-        self.screw_drill_diameter = Decimal("2.05") # use auto circle contour-hole compensation
+        self.screw_drill_diameter = Decimal("2.05") + Decimal("0.38") # measured value
         self.screw_head_thickness = Decimal("1.5")
         self.screw_head_diameter = Decimal("4.1")
 
