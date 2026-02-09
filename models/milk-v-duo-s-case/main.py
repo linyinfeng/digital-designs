@@ -782,3 +782,15 @@ export_stl(upper_case_builder.part, f"{script_directory}/../../outputs/milk-v-du
 export_stl(lower_case_builder.part, f"{script_directory}/../../outputs/milk-v-duo-s-case-lower.stl")
 
 # %%
+
+with BuildPart() as hole_tester_builder:
+    with BuildSketch(Plane.XY):
+        Circle(f(config.mounting_hole_diameter_outer / 2))
+        Circle(f(config.screw_drill_diameter / 2), mode=Mode.SUBTRACT)
+    extrude(amount=5)
+
+show(hole_tester_builder)
+
+export_stl(hole_tester_builder.part, f"{script_directory}/../../outputs/milk-v-duo-s-case-tapping-tester.stl")
+
+# %%
