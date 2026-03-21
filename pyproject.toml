@@ -11,6 +11,7 @@ dependencies = [
   "jupyter>=1.1.1",
   "ocp-vscode>=3.0.1",
   "pint>=0.25.2",
+  "svg-py>=1.10.0",
 ]
 
 [dependency-groups]
